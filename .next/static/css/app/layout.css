@@ -1501,6 +1501,14 @@ video {
     height: 20rem;
   }
 
+  .sm\:h-24 {
+    height: 6rem;
+  }
+
+  .sm\:h-16 {
+    height: 4rem;
+  }
+
   .sm\:w-10 {
     width: 2.5rem;
   }
@@ -1709,6 +1717,10 @@ video {
 
   .md\:h-5 {
     height: 1.25rem;
+  }
+
+  .md\:h-28 {
+    height: 7rem;
   }
 
   .md\:w-7 {
@@ -1920,6 +1932,10 @@ video {
 
   .lg\:h-\[450px\] {
     height: 450px;
+  }
+
+  .lg\:h-32 {
+    height: 8rem;
   }
 
   .lg\:columns-4 {
