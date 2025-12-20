@@ -10,7 +10,7 @@ interface StepCardProps {
 export default function StepCard({ stepNumber, title, description, icon }: StepCardProps) {
   return (
     <div className="flex items-start gap-4 w-full bg-navy-900/50 border border-navy-800/50 rounded-xl p-5 sm:p-6 hover:border-navy-700/50 transition-colors">
-      <div className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 rounded-full bg-accent-blue/20 text-accent-blue font-semibold text-lg sm:text-xl border border-accent-blue/30">
+      <div className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 rounded-full bg-accent-red/20 text-accent-red font-semibold text-lg sm:text-xl border border-accent-red/30">
         {stepNumber}
       </div>
       <div className="flex-1 min-w-0">

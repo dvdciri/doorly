@@ -54,7 +54,7 @@ export default function EmptyPage() {
           <div className="text-center mb-8 md:mb-12">
             <div className="flex justify-center mb-6 md:mb-8">
               <Image
-                src="/logo2.png"
+                src="/logo-red.png"
                 alt="Doorly Properties"
                 width={200}
                 height={80}
@@ -63,7 +63,8 @@ export default function EmptyPage() {
               />
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-50 mb-4 md:mb-6 leading-tight px-2">
-              A simpler way to sell your house
+              A simpler way to sell your{' '}
+              <span className="text-accent-red">house</span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed px-2">
               Sell directly to a cash buyer, in your property's current condition, with no agents, no fees, and no obligation.
@@ -78,19 +79,19 @@ export default function EmptyPage() {
           {/* Trust Band */}
           <div className="flex flex-wrap justify-center gap-3 sm:gap-4 md:gap-6 text-xs sm:text-sm md:text-base mb-8 md:mb-12">
             <div className="flex items-center gap-2 text-gray-300 min-h-[44px] px-2">
-              <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-accent-blue flex-shrink-0" />
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-accent-red flex-shrink-0" />
               <span>No fees</span>
             </div>
             <div className="flex items-center gap-2 text-gray-300 min-h-[44px] px-2">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-accent-blue flex-shrink-0" />
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-accent-red flex-shrink-0" />
               <span>No agents</span>
             </div>
             <div className="flex items-center gap-2 text-gray-300 min-h-[44px] px-2">
-              <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-accent-blue flex-shrink-0" />
+              <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-accent-red flex-shrink-0" />
               <span>Private sale</span>
             </div>
             <div className="flex items-center gap-2 text-gray-300 min-h-[44px] px-2">
-              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-accent-blue flex-shrink-0" />
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-accent-red flex-shrink-0" />
               <span>Cash offer in 48h</span>
             </div>
           </div>
@@ -98,7 +99,8 @@ export default function EmptyPage() {
           {/* How It Works Section */}
           <div className="mt-12 md:mt-20 mb-8 md:mb-12">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-50 text-center mb-8 md:mb-12 px-2">
-              How it works
+              How it{' '}
+              <span className="text-accent-red">works</span>
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <StepCard
@@ -130,7 +132,8 @@ export default function EmptyPage() {
       <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-12 md:pb-20">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-50 text-center mb-8 md:mb-12 px-2">
-            What types of properties we buy
+            What types of{' '}
+            <span className="text-accent-red">properties</span> we buy
           </h2>
           <div className="flex flex-wrap justify-center gap-3">
             {propertyTypes.map((type) => (
@@ -205,7 +208,8 @@ export default function EmptyPage() {
       <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-12 md:pb-20 bg-navy-900/30">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-50 text-center mb-8 md:mb-12 px-2">
-            Why choose us
+            Why choose{' '}
+            <span className="text-accent-red">us</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <BenefitCard
@@ -235,14 +239,15 @@ export default function EmptyPage() {
       {/* Peace of Mind Section */}
       <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-12 md:pb-20">
         <div className="max-w-4xl mx-auto">
-          <div className="bg-navy-900/50 border border-accent-blue/30 rounded-2xl p-8 md:p-12 shadow-xl">
+          <div className="bg-navy-900/50 border border-accent-red/30 rounded-2xl p-8 md:p-12 shadow-xl">
             <div className="flex justify-center mb-6">
-              <div className="flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-accent-blue/20 border border-accent-blue/30">
-                <ShieldCheck className="w-8 h-8 sm:w-10 sm:h-10 text-accent-blue" />
+              <div className="flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-accent-red/20 border border-accent-red/30">
+                <ShieldCheck className="w-8 h-8 sm:w-10 sm:h-10 text-accent-red" />
               </div>
             </div>
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-50 mb-6 text-center px-2">
-              Complete peace of mind
+              Complete{' '}
+              <span className="text-accent-red">peace of mind</span>
             </h2>
             <div className="space-y-4 text-gray-300 text-base sm:text-lg leading-relaxed text-center px-2">
               <p>
@@ -263,7 +268,8 @@ export default function EmptyPage() {
       <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-12 md:pb-20">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-50 text-center mb-8 md:mb-12 px-2">
-            Frequently asked questions
+            Frequently asked{' '}
+            <span className="text-accent-red">questions</span>
           </h2>
           <Accordion items={faqItems} />
         </div>
@@ -277,10 +283,10 @@ export default function EmptyPage() {
               <p>© {new Date().getFullYear()} Doorly Properties Limited. All rights reserved.</p>
             </div>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-xs sm:text-sm">
-              <a href="mailto:info@doorlyproperties.com" className="text-gray-400 hover:text-gray-200 transition-colors min-h-[44px] flex items-center px-2 break-all">
-                info@doorlyproperties.com
+              <a href="mailto:doorly.properties@gmail.com" className="text-accent-red hover:text-accent-red/80 transition-colors min-h-[44px] flex items-center px-2 break-all">
+                doorly.properties@gmail.com
               </a>
-              <a href="tel:+447761108037" className="text-gray-400 hover:text-gray-200 transition-colors min-h-[44px] flex items-center px-2">
+              <a href="tel:+447761108037" className="text-accent-red hover:text-accent-red/80 transition-colors min-h-[44px] flex items-center px-2">
                 +44 07761108037
               </a>
             </div>

@@ -17,7 +17,7 @@ function AccordionItem({ question, answer, defaultOpen = false }: AccordionItemP
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full py-4 sm:py-5 min-h-[56px] text-left flex items-center justify-between gap-4 focus:outline-none focus:ring-2 focus:ring-accent-blue rounded-lg px-2 -mx-2 active:bg-navy-800/30"
+        className="w-full py-4 sm:py-5 min-h-[56px] text-left flex items-center justify-between gap-4 focus:outline-none focus:ring-2 focus:ring-accent-red rounded-lg px-2 -mx-2 active:bg-navy-800/30"
         aria-expanded={isOpen}
       >
         <h4 className="text-base sm:text-lg font-semibold text-gray-50 pr-4 break-words">{question}</h4>

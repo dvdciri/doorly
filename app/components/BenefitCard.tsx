@@ -9,7 +9,7 @@ interface BenefitCardProps {
 export default function BenefitCard({ icon, title, description }: BenefitCardProps) {
   return (
     <div className="flex items-start gap-4 w-full bg-navy-900/50 border border-navy-800/50 rounded-xl p-5 sm:p-6 hover:border-navy-700/50 transition-colors">
-      <div className="flex items-center justify-center flex-shrink-0 text-accent-blue">
+      <div className="flex items-center justify-center flex-shrink-0 text-accent-red">
         {icon}
       </div>
       <div className="flex-1 min-w-0">

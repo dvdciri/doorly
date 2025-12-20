@@ -22,8 +22,7 @@ module.exports = {
           950: '#0a1628',
         },
         accent: {
-          blue: '#3b82f6',
-          'blue-dark': '#2563eb',
+          red: '#ea4b4b',
         },
       },
       backgroundImage: {

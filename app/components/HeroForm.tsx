@@ -55,7 +55,7 @@ export default function HeroForm() {
               value={formData.postcode}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-blue focus:border-transparent outline-none transition text-base sm:text-lg"
+              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg"
               placeholder="e.g., SW1A 1AA"
             />
           </div>
@@ -71,7 +71,7 @@ export default function HeroForm() {
                 value={formData.propertyType}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 focus:ring-2 focus:ring-accent-blue focus:border-transparent outline-none transition text-base sm:text-lg appearance-none pr-10"
+                className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg appearance-none pr-10"
               >
                 <option value="" className="bg-navy-900">Select property type</option>
                 <option value="house" className="bg-navy-900">House</option>
@@ -87,7 +87,7 @@ export default function HeroForm() {
 
           <button
             type="submit"
-            className="w-full bg-accent-blue hover:bg-accent-blue-dark active:scale-95 text-white py-4 px-6 min-h-[52px] rounded-xl font-semibold text-base sm:text-lg transition-all shadow-lg shadow-accent-blue/20 flex items-center justify-center gap-2"
+            className="w-full bg-accent-red hover:bg-accent-red/90 active:scale-95 text-white py-4 px-6 min-h-[52px] rounded-xl font-semibold text-base sm:text-lg transition-all shadow-lg shadow-accent-red/20 flex items-center justify-center gap-2"
           >
             Get my offer
             <ChevronRight className="w-5 h-5" />
@@ -121,7 +121,7 @@ export default function HeroForm() {
               value={formData.name}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-blue focus:border-transparent outline-none transition text-base sm:text-lg"
+              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg"
               placeholder="Your name"
             />
           </div>
@@ -137,7 +137,7 @@ export default function HeroForm() {
               value={formData.email}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-blue focus:border-transparent outline-none transition text-base sm:text-lg"
+              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg"
               placeholder="your.email@example.com"
             />
           </div>
@@ -153,7 +153,7 @@ export default function HeroForm() {
               value={formData.phone}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-blue focus:border-transparent outline-none transition text-base sm:text-lg"
+              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg"
               placeholder="07123 456789"
             />
           </div>
@@ -161,7 +161,7 @@ export default function HeroForm() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-accent-blue hover:bg-accent-blue-dark text-white py-4 px-6 rounded-xl font-semibold text-lg transition-colors shadow-lg shadow-accent-blue/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-accent-red hover:bg-accent-red/90 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-colors shadow-lg shadow-accent-red/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isSubmitting ? 'Submitting...' : 'Submit my details'}
             {!isSubmitting && <ChevronRight className="w-5 h-5" />}

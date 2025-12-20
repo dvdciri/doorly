@@ -21,7 +21,7 @@ export default function StickyCTA() {
         <div className="px-4 py-3">
           <button
             onClick={scrollToForm}
-            className="w-full bg-accent-blue hover:bg-accent-blue-dark text-white py-4 px-6 min-h-[56px] rounded-xl font-semibold text-base sm:text-lg transition-all shadow-lg shadow-accent-blue/20 active:scale-95"
+            className="w-full bg-accent-red hover:bg-accent-red/90 text-white py-4 px-6 min-h-[56px] rounded-xl font-semibold text-base sm:text-lg transition-all shadow-lg shadow-accent-red/20 active:scale-95"
           >
             Get my offer
           </button>
