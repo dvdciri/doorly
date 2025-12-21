@@ -6,6 +6,7 @@ import ConfirmationDialog from './ConfirmationDialog'
 
 export default function HeroForm() {
   const [step, setStep] = useState(1)
+  const [animationDirection, setAnimationDirection] = useState<'forward' | 'backward'>('forward')
   const [formData, setFormData] = useState({
     address: '',
     propertyState: '',
@@ -63,6 +64,7 @@ export default function HeroForm() {
     setErrors(newErrors)
 
     if (formData.address.trim() && formData.propertyState.trim()) {
+      setAnimationDirection('forward')
       setStep(2)
     }
   }
@@ -112,6 +114,7 @@ export default function HeroForm() {
           name: '',
           phone: '',
         })
+        setAnimationDirection('forward')
         setStep(1)
       } catch (error: any) {
         console.error('Error submitting form:', error)
@@ -138,11 +141,26 @@ export default function HeroForm() {
     }
   }
 
+  const handleBackClick = () => {
+    setAnimationDirection('backward')
+    setStep(1)
+  }
+
   return (
     <>
-      <div className="bg-navy-900/50 backdrop-blur-sm border border-navy-800/50 rounded-2xl p-4 sm:p-6 md:p-8 shadow-xl">
-        {step === 1 ? (
-        <form onSubmit={handleStep1Submit} className="space-y-4">
+      <div className="bg-navy-900/50 backdrop-blur-sm border border-navy-800/50 rounded-2xl p-4 sm:p-6 md:p-8 shadow-xl relative">
+        <div className="relative overflow-x-clip md:overflow-visible -mx-1 px-1">
+          {/* Step 1 */}
+          <div
+            className={`w-full transition-all duration-300 ease-in-out md:duration-200 ${
+              step === 1
+                ? 'translate-x-0 relative z-10 md:z-auto'
+                : animationDirection === 'forward'
+                  ? '-translate-x-full absolute inset-0 z-0 md:translate-x-0 md:opacity-0 md:pointer-events-none'
+                  : 'translate-x-full absolute inset-0 z-0 md:translate-x-0 md:opacity-0 md:pointer-events-none'
+            }`}
+          >
+            <form onSubmit={handleStep1Submit} className="space-y-4">
           <div>
             <label htmlFor="address" className="block text-sm font-medium text-gray-300 mb-2">
               Full address of the property
@@ -174,7 +192,7 @@ export default function HeroForm() {
               value={formData.propertyState}
               onChange={handleChange}
               required
-              className={`w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border rounded-xl text-gray-50 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg ${
+              className={`w-full pl-4 pr-12 py-3.5 min-h-[48px] bg-navy-800/50 border rounded-xl text-gray-50 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg ${
                 errors.propertyState ? 'border-red-500' : 'border-navy-700'
               }`}
             >
@@ -198,16 +216,26 @@ export default function HeroForm() {
             <ChevronRight className="w-5 h-5" />
           </button>
         </form>
-      ) : (
-        <form onSubmit={handleStep2Submit} className="space-y-4">
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="text-gray-400 hover:text-gray-200 transition-colors min-h-[44px] flex items-center px-2 -ml-2"
-            >
-              ← Back
-            </button>
+          </div>
+
+          {/* Step 2 */}
+          <div
+            className={`w-full transition-all duration-300 ease-in-out md:duration-200 ${
+              step === 2
+                ? 'translate-x-0 relative z-10 md:z-auto md:opacity-100'
+                : 'absolute left-0 top-0 w-full translate-x-full z-0 opacity-0 pointer-events-none md:translate-x-0 md:opacity-0'
+            }`}
+            style={step !== 2 ? { willChange: 'transform' } : {}}
+          >
+            <form onSubmit={handleStep2Submit} className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={handleBackClick}
+                  className="text-gray-400 hover:text-gray-200 transition-colors min-h-[44px] flex items-center px-2 -ml-2"
+                >
+                  ← Back
+                </button>
             <span className="text-sm text-gray-400">Step 2 of 2</span>
           </div>
 
@@ -257,7 +285,8 @@ export default function HeroForm() {
             {!isSubmitting && <ChevronRight className="w-5 h-5" />}
           </button>
         </form>
-        )}
+          </div>
+        </div>
 
         {/* Submit error message */}
         {submitError && (
