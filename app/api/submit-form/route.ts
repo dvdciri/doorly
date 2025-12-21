@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { query, initializeDatabase } from '@/lib/db'
+import { sendFormSubmissionEmail } from '@/lib/email'
 
 // Initialize database on first import
 let dbInitialized = false
@@ -73,6 +74,20 @@ export async function POST(request: Request) {
        RETURNING id, created_at`,
       [sanitizedAddress, sanitizedPropertyState, sanitizedName, sanitizedPhone]
     )
+
+    // Send email notification (don't fail form submission if email fails)
+    try {
+      await sendFormSubmissionEmail({
+        address: sanitizedAddress,
+        propertyState: sanitizedPropertyState,
+        name: sanitizedName,
+        phone: sanitizedPhone,
+        submittedAt: new Date(result.rows[0].created_at),
+      })
+    } catch (emailError: any) {
+      // Log error but don't fail the form submission
+      console.error('Email notification failed, but form submission succeeded:', emailError.message || emailError)
+    }
 
     return NextResponse.json(
       {
