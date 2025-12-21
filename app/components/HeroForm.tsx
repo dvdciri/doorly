@@ -194,7 +194,7 @@ export default function HeroForm() {
             type="submit"
             className="w-full bg-accent-red hover:bg-accent-red/90 active:scale-95 text-white py-4 px-6 min-h-[52px] rounded-xl font-semibold text-base sm:text-lg transition-all shadow-lg shadow-accent-red/20 flex items-center justify-center gap-2"
           >
-            Get my offer
+            Continue
             <ChevronRight className="w-5 h-5" />
           </button>
         </form>
@@ -253,7 +253,7 @@ export default function HeroForm() {
             disabled={isSubmitting}
             className="w-full bg-accent-red hover:bg-accent-red/90 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-colors shadow-lg shadow-accent-red/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit my details'}
+            {isSubmitting ? 'Submitting...' : 'Submit'}
             {!isSubmitting && <ChevronRight className="w-5 h-5" />}
           </button>
         </form>
