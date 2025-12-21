@@ -8,7 +8,7 @@ import Footer from './components/Footer'
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-navy-gradient">
+    <div className="min-h-screen bg-navy-gradient px-4 md:px-0">
       <Navigation />
       <Hero />
       <EmptyHouseCTA />

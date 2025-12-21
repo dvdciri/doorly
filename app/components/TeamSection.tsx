@@ -21,7 +21,17 @@ export default function TeamSection() {
           About{' '}
           <span className="text-accent-red">us</span>
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6 max-w-2xl mx-auto mb-12 sm:mb-16 md:mb-20">
+        
+        <div className="max-w-3xl mx-auto px-4 mb-8 sm:mb-10 md:mb-12">
+          <p className="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed text-center">
+            Originally from Italy and Bulgaria, we've called the UK home for more than a decade. Martial arts, travel, and adrenaline have always been central to who we are, teaching us focus, courage, and the confidence to explore new paths.
+          </p>
+          <p className="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed text-center mt-4 sm:mt-6">
+            Professionally, we bring together software engineering and finance, blending creativity with analytical thinking. From investing to travel-driven experiences, we believe in smart decisions, continuous learning, and building a life shaped by curiosity and purpose.
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 md:gap-6 max-w-xs sm:max-w-md md:max-w-2xl mx-auto mb-8 sm:mb-10 md:mb-12">
           {teamMembers.map((member, index) => (
             <div
               key={index}
@@ -35,11 +45,11 @@ export default function TeamSection() {
                   className="object-cover"
                 />
               </div>
-              <div className="p-4 sm:p-5 md:p-6">
-                <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-50 mb-1 sm:mb-2">
+              <div className="p-3 sm:p-5 md:p-6">
+                <h3 className="text-sm sm:text-lg md:text-xl font-bold text-gray-50 mb-1 sm:mb-2">
                   {member.name}
                 </h3>
-                <p className="text-accent-red font-semibold text-sm sm:text-base">
+                <p className="text-accent-red font-semibold text-xs sm:text-base">
                   {member.role}
                 </p>
               </div>

@@ -47,7 +47,7 @@ export default function EmptyPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-navy-gradient">
+    <div className="min-h-screen bg-navy-gradient px-4 md:px-0">
       {/* Hero Section */}
       <section id="hero-form" className="px-4 sm:px-6 lg:px-8 pt-12 pb-8 md:pt-20 md:pb-12">
         <div className="max-w-4xl mx-auto">
