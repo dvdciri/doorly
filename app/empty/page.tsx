@@ -215,7 +215,7 @@ export default function EmptyPage() {
             <BenefitCard
               icon={<Shield className="w-8 h-8" />}
               title="No fees"
-              description="We cover all costs. No hidden fees, no agent commissions."
+              description="No hidden fees, no agent commissions."
             />
             <BenefitCard
               icon={<Users className="w-8 h-8" />}

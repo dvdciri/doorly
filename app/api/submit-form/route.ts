@@ -38,16 +38,13 @@ export async function POST(request: Request) {
       )
     }
 
-    // Ensure database is initialized
-    await ensureDatabaseInitialized()
-
     const body = await request.json()
-    const { address, name, phone } = body
+    const { address, propertyState, name, phone } = body
 
     // Validate required fields
-    if (!address || !name || !phone) {
+    if (!address || !propertyState || !name || !phone) {
       return NextResponse.json(
-        { error: 'Address, name, and phone number are required' },
+        { error: 'Address, property state, name, and phone number are required' },
         { status: 400 }
       )
     }
@@ -60,17 +57,21 @@ export async function POST(request: Request) {
       )
     }
 
+    // Ensure table exists before inserting (creates table if it doesn't exist)
+    await initializeDatabase()
+
     // Sanitize inputs (basic sanitization - PostgreSQL parameterized queries handle SQL injection)
     const sanitizedAddress = address.trim()
+    const sanitizedPropertyState = propertyState.trim()
     const sanitizedName = name.trim()
     const sanitizedPhone = phone.trim()
 
     // Insert into database
     const result = await query(
-      `INSERT INTO empty_property_submission (address, name, phone)
-       VALUES ($1, $2, $3)
+      `INSERT INTO empty_property_submission (address, property_state, name, phone)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, created_at`,
-      [sanitizedAddress, sanitizedName, sanitizedPhone]
+      [sanitizedAddress, sanitizedPropertyState, sanitizedName, sanitizedPhone]
     )
 
     return NextResponse.json(

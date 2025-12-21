@@ -8,12 +8,14 @@ export default function HeroForm() {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
     address: '',
+    propertyState: '',
     name: '',
     phone: '',
   })
 
   const [errors, setErrors] = useState({
     address: '',
+    propertyState: '',
     phone: '',
   })
 
@@ -52,9 +54,15 @@ export default function HeroForm() {
       newErrors.address = ''
     }
 
+    if (!formData.propertyState.trim()) {
+      newErrors.propertyState = 'Please select the property state'
+    } else {
+      newErrors.propertyState = ''
+    }
+
     setErrors(newErrors)
 
-    if (formData.address.trim()) {
+    if (formData.address.trim() && formData.propertyState.trim()) {
       setStep(2)
     }
   }
@@ -100,6 +108,7 @@ export default function HeroForm() {
         // Reset form
         setFormData({
           address: '',
+          propertyState: '',
           name: '',
           phone: '',
         })
@@ -152,6 +161,32 @@ export default function HeroForm() {
             />
             {errors.address && (
               <p className="mt-1 text-sm text-red-400">{errors.address}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="propertyState" className="block text-sm font-medium text-gray-300 mb-2">
+              What is the state of the property?
+            </label>
+            <select
+              id="propertyState"
+              name="propertyState"
+              value={formData.propertyState}
+              onChange={handleChange}
+              required
+              className={`w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border rounded-xl text-gray-50 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg ${
+                errors.propertyState ? 'border-red-500' : 'border-navy-700'
+              }`}
+            >
+              <option value="">Select an option</option>
+              <option value="recently-refurbished">Recently refurbished</option>
+              <option value="good-condition">Good condition</option>
+              <option value="needs-renovation">Needs renovation</option>
+              <option value="lightly-dated">Lightly dated</option>
+              <option value="needs-major-work">Needs major work</option>
+            </select>
+            {errors.propertyState && (
+              <p className="mt-1 text-sm text-red-400">{errors.propertyState}</p>
             )}
           </div>
 
