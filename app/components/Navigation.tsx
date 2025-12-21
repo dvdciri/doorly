@@ -2,7 +2,7 @@ import Image from 'next/image'
 
 export default function Navigation() {
   return (
-    <nav className="w-full bg-navy-950 border-b border-navy-800 sticky top-0 z-50">
+    <nav className="w-full border-b border-navy-800 sticky top-0 z-50">
       <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
         <div className="flex items-center justify-between h-20 sm:h-24 md:h-28 lg:h-32">
           {/* Logo - Left aligned */}

@@ -132,8 +132,8 @@ export default function EmptyPage() {
       <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-12 md:pb-20">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-50 text-center mb-8 md:mb-12 px-2">
-            What types of{' '}
-            <span className="text-accent-red">properties</span> we buy
+            What we're{' '}
+            <span className="text-accent-red">looking to buy</span>
           </h2>
           <div className="flex flex-wrap justify-center gap-3">
             {propertyTypes.map((type) => (

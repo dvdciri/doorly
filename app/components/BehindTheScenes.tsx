@@ -21,7 +21,7 @@ export default function BehindTheScenes() {
     fetchImages()
   }, [])
   return (
-    <section className="w-full bg-navy-950 py-8 sm:py-12 md:py-16 lg:py-20">
+    <section className="w-full py-8 sm:py-12 md:py-16 lg:py-20">
       <div className="container mx-auto px-4 sm:px-6 md:px-6 lg:px-8 max-w-7xl">
         <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-50 mb-6 sm:mb-8 md:mb-12 text-center px-2">
           Behind the{' '}

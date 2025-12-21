@@ -3,9 +3,10 @@ import { Project } from '@/app/data/projects'
 
 interface ProjectCardProps {
   project: Project
+  disableHover?: boolean
 }
 
-export default function ProjectCard({ project }: ProjectCardProps) {
+export default function ProjectCard({ project, disableHover = false }: ProjectCardProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-GB', {
       style: 'currency',
@@ -16,7 +17,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   }
 
   return (
-    <div className="bg-navy-900 rounded-lg shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 border border-navy-800 h-full flex flex-col">
+    <div className={`bg-navy-900 rounded-lg shadow-lg overflow-hidden transition-all duration-300 border border-navy-800 h-full flex flex-col ${disableHover ? '' : 'hover:shadow-xl hover:scale-105'}`}>
       <div className="aspect-video w-full bg-navy-800 relative overflow-hidden">
         <Image
           src={project.picture}

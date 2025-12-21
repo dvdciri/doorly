@@ -1,88 +1,158 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, ChevronDown } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
+import ConfirmationDialog from './ConfirmationDialog'
 
 export default function HeroForm() {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
-    postcode: '',
-    propertyType: '',
+    address: '',
     name: '',
-    email: '',
+    phone: '',
+  })
+
+  const [errors, setErrors] = useState({
+    address: '',
     phone: '',
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  // Validate UK phone number
+  const validateUKPhone = (phone: string): boolean => {
+    // Remove all spaces, dashes, parentheses, and plus signs for validation
+    const cleaned = phone.replace(/[\s\-\(\)\+]/g, '')
+    
+    // Check if it starts with 0 or 44
+    if (cleaned.startsWith('44')) {
+      // International format: +44 followed by 10 digits
+      const digits = cleaned.substring(2)
+      return /^\d{10}$/.test(digits)
+    } else if (cleaned.startsWith('0')) {
+      // UK format: 0 followed by 10 digits
+      const digits = cleaned.substring(1)
+      return /^\d{10}$/.test(digits)
+    }
+    
+    // If it doesn't start with 0 or 44, check if it's exactly 10 digits
+    return /^\d{10}$/.test(cleaned)
+  }
+
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (formData.postcode && formData.propertyType) {
+    const newErrors = { ...errors }
+    
+    if (!formData.address.trim()) {
+      newErrors.address = 'Please enter the full address'
+    } else {
+      newErrors.address = ''
+    }
+
+    setErrors(newErrors)
+
+    if (formData.address.trim()) {
       setStep(2)
     }
   }
 
   const handleStep2Submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
-    // TODO: Implement form submission logic
-    console.log('Form submitted:', formData)
-    setTimeout(() => {
-      setIsSubmitting(false)
-      alert('Thank you for your submission. We will be in touch within 48 hours.')
-    }, 1000)
+    setSubmitError('')
+    
+    const newErrors = {
+      phone: '',
+    }
+
+    // Validate phone
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required'
+    } else if (!validateUKPhone(formData.phone)) {
+      newErrors.phone = 'Please enter a valid UK phone number (e.g., 07123 456789 or +44 7123 456789)'
+    }
+
+    setErrors({ ...errors, ...newErrors })
+
+    // Only submit if there are no errors
+    if (!newErrors.phone) {
+      setIsSubmitting(true)
+      
+      try {
+        const response = await fetch('/api/submit-form', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to submit form')
+        }
+
+        // Success - show confirmation dialog
+        setShowConfirmation(true)
+        // Reset form
+        setFormData({
+          address: '',
+          name: '',
+          phone: '',
+        })
+        setStep(1)
+      } catch (error: any) {
+        console.error('Error submitting form:', error)
+        setSubmitError(error.message || 'Failed to submit form. Please try again later.')
+      } finally {
+        setIsSubmitting(false)
+      }
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     })
+    
+    // Clear error when user starts typing
+    if (errors[name as keyof typeof errors]) {
+      setErrors({
+        ...errors,
+        [name]: '',
+      })
+    }
   }
 
   return (
-    <div className="bg-navy-900/50 backdrop-blur-sm border border-navy-800/50 rounded-2xl p-4 sm:p-6 md:p-8 shadow-xl">
-      {step === 1 ? (
+    <>
+      <div className="bg-navy-900/50 backdrop-blur-sm border border-navy-800/50 rounded-2xl p-4 sm:p-6 md:p-8 shadow-xl">
+        {step === 1 ? (
         <form onSubmit={handleStep1Submit} className="space-y-4">
           <div>
-            <label htmlFor="postcode" className="block text-sm font-medium text-gray-300 mb-2">
-              Postcode
+            <label htmlFor="address" className="block text-sm font-medium text-gray-300 mb-2">
+              Full address of the property
             </label>
             <input
               type="text"
-              id="postcode"
-              name="postcode"
-              value={formData.postcode}
+              id="address"
+              name="address"
+              value={formData.address}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg"
-              placeholder="e.g., SW1A 1AA"
+              className={`w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg ${
+                errors.address ? 'border-red-500' : 'border-navy-700'
+              }`}
+              placeholder="e.g., 123 High Street, London, SW1A 1AA"
             />
-          </div>
-
-          <div>
-            <label htmlFor="propertyType" className="block text-sm font-medium text-gray-300 mb-2">
-              Property Type
-            </label>
-            <div className="relative">
-              <select
-                id="propertyType"
-                name="propertyType"
-                value={formData.propertyType}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg appearance-none pr-10"
-              >
-                <option value="" className="bg-navy-900">Select property type</option>
-                <option value="house" className="bg-navy-900">House</option>
-                <option value="flat" className="bg-navy-900">Flat</option>
-                <option value="bungalow" className="bg-navy-900">Bungalow</option>
-                <option value="other" className="bg-navy-900">Other</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <ChevronDown className="w-5 h-5 text-gray-400" />
-              </div>
-            </div>
+            {errors.address && (
+              <p className="mt-1 text-sm text-red-400">{errors.address}</p>
+            )}
           </div>
 
           <button
@@ -92,10 +162,6 @@ export default function HeroForm() {
             Get my offer
             <ChevronRight className="w-5 h-5" />
           </button>
-
-          <p className="text-xs text-gray-400 text-center mt-3">
-            No obligation • Off-market • Your details stay private
-          </p>
         </form>
       ) : (
         <form onSubmit={handleStep2Submit} className="space-y-4">
@@ -127,22 +193,6 @@ export default function HeroForm() {
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg"
-              placeholder="your.email@example.com"
-            />
-          </div>
-
-          <div>
             <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
               Phone Number
             </label>
@@ -153,9 +203,14 @@ export default function HeroForm() {
               value={formData.phone}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg"
-              placeholder="07123 456789"
+              className={`w-full px-4 py-3.5 min-h-[48px] bg-navy-800/50 border rounded-xl text-gray-50 placeholder-gray-400 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg ${
+                errors.phone ? 'border-red-500' : 'border-navy-700'
+              }`}
+              placeholder="07123 456789 or +44 7123 456789"
             />
+            {errors.phone && (
+              <p className="mt-1 text-sm text-red-400">{errors.phone}</p>
+            )}
           </div>
 
           <button
@@ -166,13 +221,23 @@ export default function HeroForm() {
             {isSubmitting ? 'Submitting...' : 'Submit my details'}
             {!isSubmitting && <ChevronRight className="w-5 h-5" />}
           </button>
-
-          <p className="text-xs text-gray-400 text-center mt-3">
-            No obligation • Off-market • Your details stay private
-          </p>
         </form>
-      )}
-    </div>
+        )}
+
+        {/* Submit error message */}
+        {submitError && (
+          <div className="mt-4 p-4 bg-red-900/20 border border-red-500/30 rounded-xl">
+            <p className="text-sm text-red-400">{submitError}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+      />
+    </>
   )
 }
 

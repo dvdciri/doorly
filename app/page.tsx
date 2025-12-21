@@ -13,8 +13,8 @@ export default function Home() {
       <Hero />
       <EmptyHouseCTA />
       <ProjectsSection />
-      <BehindTheScenes />
       <TeamSection />
+      <BehindTheScenes />
       <Footer />
     </div>
   )

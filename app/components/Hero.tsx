@@ -2,16 +2,16 @@ import Image from 'next/image'
 
 export default function Hero() {
   return (
-    <section className="w-full bg-navy-gradient py-6 sm:py-8 md:py-12 lg:py-16">
+    <section className="w-full py-6 sm:py-8 md:py-12 lg:py-16">
       <div className="container mx-auto px-4 sm:px-6 md:px-6 lg:px-8 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
           {/* Text Content */}
           <div className="order-2 lg:order-1">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-50 mb-3 sm:mb-4 md:mb-6 leading-tight">
-              We are <span className="text-accent-red">Doorly</span> Properties!
+              Welcome to <br />Doorly Properties
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-gray-300 mb-4 sm:mb-6 md:mb-8 leading-relaxed">
-              A property investment company from Davide Cirillo that focuses on providing affordable housing for tenants across the UK.
+            A property investment company founded by Davide Cirillo, focused on providing affordable housing for tenants across the UK.
             </p>
             <div className="h-1 w-16 sm:w-20 bg-accent-red mb-4 sm:mb-6 md:mb-8"></div>
             
