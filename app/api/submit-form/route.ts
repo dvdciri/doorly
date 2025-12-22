@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { query, initializeDatabase } from '@/lib/db'
 import { sendFormSubmissionEmail } from '@/lib/email'
+import { sendLeadEvent } from '@/lib/facebook-conversions'
 
 // Initialize database on first import
 let dbInitialized = false
@@ -67,13 +68,36 @@ export async function POST(request: Request) {
     const sanitizedName = name.trim()
     const sanitizedPhone = phone.trim()
 
-    // Insert into database
-    const result = await query(
-      `INSERT INTO empty_property_submission (address, property_state, name, phone)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, created_at`,
-      [sanitizedAddress, sanitizedPropertyState, sanitizedName, sanitizedPhone]
+    // Check if a partial submission with this address and property_state already exists
+    const existingCheck = await query(
+      `SELECT id, created_at FROM empty_property_submission 
+       WHERE address = $1 AND property_state = $2 AND status = 'partial' 
+       ORDER BY created_at DESC LIMIT 1`,
+      [sanitizedAddress, sanitizedPropertyState]
     )
+
+    let result: any
+
+    if (existingCheck.rows.length > 0) {
+      // Update existing partial submission with step 2 data
+      result = await query(
+        `UPDATE empty_property_submission 
+         SET name = $1, phone = $2, status = 'complete', updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $3
+         RETURNING id, created_at, updated_at`,
+        [sanitizedName, sanitizedPhone, existingCheck.rows[0].id]
+      )
+      // Use created_at from existing record
+      result.rows[0].created_at = existingCheck.rows[0].created_at
+    } else {
+      // Insert new complete submission
+      result = await query(
+        `INSERT INTO empty_property_submission (address, property_state, name, phone, status)
+         VALUES ($1, $2, $3, $4, 'complete')
+         RETURNING id, created_at, updated_at`,
+        [sanitizedAddress, sanitizedPropertyState, sanitizedName, sanitizedPhone]
+      )
+    }
 
     // Send email notification (don't fail form submission if email fails)
     try {
@@ -82,11 +106,24 @@ export async function POST(request: Request) {
         propertyState: sanitizedPropertyState,
         name: sanitizedName,
         phone: sanitizedPhone,
-        submittedAt: new Date(result.rows[0].created_at),
+        submittedAt: new Date(result.rows[0].updated_at || result.rows[0].created_at),
       })
     } catch (emailError: any) {
       // Log error but don't fail the form submission
       console.error('Email notification failed, but form submission succeeded:', emailError.message || emailError)
+    }
+
+    // Send Lead event to Facebook Conversions API (don't fail form submission if this fails)
+    try {
+      await sendLeadEvent(request, {
+        phone: sanitizedPhone,
+        name: sanitizedName,
+        address: sanitizedAddress,
+        propertyState: sanitizedPropertyState,
+      })
+    } catch (fbError: any) {
+      // Log error but don't fail the form submission
+      console.error('Facebook Conversions API Lead event failed, but form submission succeeded:', fbError.message || fbError)
     }
 
     return NextResponse.json(

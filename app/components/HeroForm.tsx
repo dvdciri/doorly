@@ -64,6 +64,40 @@ export default function HeroForm() {
     setErrors(newErrors)
 
     if (formData.address.trim() && formData.propertyState.trim()) {
+      // Save step 1 data to database (partial submission)
+      fetch('/api/submit-step1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          address: formData.address.trim(),
+          propertyState: formData.propertyState.trim(),
+        }),
+      }).catch((error) => {
+        // Fail silently - don't break user experience
+        console.error('Step 1 database save failed:', error)
+      })
+
+      // Track step 1 completion (Facebook event)
+      fetch('/api/facebook/form-step1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          address: formData.address.trim(),
+          propertyState: formData.propertyState.trim(),
+          name: formData.name.trim() || undefined,
+          phone: formData.phone.trim() || undefined,
+          userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined,
+          url: typeof window !== 'undefined' ? window.location.href : undefined,
+        }),
+      }).catch((error) => {
+        // Fail silently - don't break user experience
+        console.error('FormStep1 tracking failed:', error)
+      })
+
       setAnimationDirection('forward')
       setStep(2)
     }

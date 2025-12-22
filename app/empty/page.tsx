@@ -6,6 +6,8 @@ import HeroForm from '../components/HeroForm'
 import BenefitCard from '../components/BenefitCard'
 import Accordion from '../components/Accordion'
 import StickyCTA from '../components/StickyCTA'
+import PageViewTracker from '../components/PageViewTracker'
+import ScrollTracker from '../components/ScrollTracker'
 
 export default function EmptyPage() {
   const propertyTypes = [
@@ -48,6 +50,8 @@ export default function EmptyPage() {
 
   return (
     <div className="min-h-screen bg-navy-gradient px-4 md:px-0">
+      <PageViewTracker />
+      <ScrollTracker />
       {/* Hero Section */}
       <section id="hero-form" className="px-4 sm:px-6 lg:px-8 pt-12 pb-8 md:pt-20 md:pb-12">
         <div className="max-w-4xl mx-auto">

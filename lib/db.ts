@@ -33,14 +33,15 @@ export async function initializeDatabase() {
         id SERIAL PRIMARY KEY,
         address TEXT NOT NULL,
         property_state TEXT NOT NULL,
-        name TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        name TEXT,
+        phone TEXT,
+        status TEXT DEFAULT 'partial',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `)
     
     // Add property_state column if it doesn't exist (for existing tables)
-    // First check if column exists, then add it if needed
     try {
       const columnCheck = await query(`
         SELECT column_name 
@@ -50,7 +51,6 @@ export async function initializeDatabase() {
       `)
       
       if (columnCheck.rows.length === 0) {
-        // Column doesn't exist, add it
         await query(`
           ALTER TABLE empty_property_submission 
           ADD COLUMN property_state TEXT;
@@ -58,8 +58,72 @@ export async function initializeDatabase() {
         console.log('Added property_state column to existing table')
       }
     } catch (alterError: any) {
-      // Ignore error if column already exists or table doesn't exist yet
       console.log('Column check/add:', alterError.message)
+    }
+    
+    // Make name and phone nullable for partial submissions
+    try {
+      await query(`
+        ALTER TABLE empty_property_submission 
+        ALTER COLUMN name DROP NOT NULL;
+      `)
+    } catch (alterError: any) {
+      // Column might already be nullable or not exist
+    }
+    
+    try {
+      await query(`
+        ALTER TABLE empty_property_submission 
+        ALTER COLUMN phone DROP NOT NULL;
+      `)
+    } catch (alterError: any) {
+      // Column might already be nullable or not exist
+    }
+    
+    // Add status column if it doesn't exist
+    try {
+      const statusCheck = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'empty_property_submission' 
+        AND column_name = 'status';
+      `)
+      
+      if (statusCheck.rows.length === 0) {
+        await query(`
+          ALTER TABLE empty_property_submission 
+          ADD COLUMN status TEXT DEFAULT 'partial';
+        `)
+        // Update existing records to 'complete' if they have name and phone
+        await query(`
+          UPDATE empty_property_submission 
+          SET status = 'complete' 
+          WHERE name IS NOT NULL AND phone IS NOT NULL;
+        `)
+        console.log('Added status column to existing table')
+      }
+    } catch (alterError: any) {
+      console.log('Status column check/add:', alterError.message)
+    }
+    
+    // Add updated_at column if it doesn't exist
+    try {
+      const updatedAtCheck = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'empty_property_submission' 
+        AND column_name = 'updated_at';
+      `)
+      
+      if (updatedAtCheck.rows.length === 0) {
+        await query(`
+          ALTER TABLE empty_property_submission 
+          ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        `)
+        console.log('Added updated_at column to existing table')
+      }
+    } catch (alterError: any) {
+      console.log('Updated_at column check/add:', alterError.message)
     }
     
     // Drop email column if it exists (for existing tables)
