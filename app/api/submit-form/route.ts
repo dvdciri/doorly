@@ -41,20 +41,12 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { address, propertyState, name, phone } = body
+    const { address, phone, propertyState, name } = body
 
     // Validate required fields
-    if (!address || !propertyState || !name || !phone) {
+    if (!address || !phone || !propertyState || !name) {
       return NextResponse.json(
-        { error: 'Address, property state, name, and phone number are required' },
-        { status: 400 }
-      )
-    }
-
-    // Validate UK phone number
-    if (!validateUKPhone(phone)) {
-      return NextResponse.json(
-        { error: 'Invalid UK phone number' },
+        { error: 'Address, phone number, property state, and name are required' },
         { status: 400 }
       )
     }
@@ -64,16 +56,16 @@ export async function POST(request: Request) {
 
     // Sanitize inputs (basic sanitization - PostgreSQL parameterized queries handle SQL injection)
     const sanitizedAddress = address.trim()
+    const sanitizedPhone = phone.trim()
     const sanitizedPropertyState = propertyState.trim()
     const sanitizedName = name.trim()
-    const sanitizedPhone = phone.trim()
 
-    // Check if a partial submission with this address and property_state already exists
+    // Check if a partial submission with this address and phone already exists
     const existingCheck = await query(
       `SELECT id, created_at FROM empty_property_submission 
-       WHERE address = $1 AND property_state = $2 AND status = 'partial' 
+       WHERE address = $1 AND phone = $2 AND status = 'partial' 
        ORDER BY created_at DESC LIMIT 1`,
-      [sanitizedAddress, sanitizedPropertyState]
+      [sanitizedAddress, sanitizedPhone]
     )
 
     let result: any
@@ -82,20 +74,20 @@ export async function POST(request: Request) {
       // Update existing partial submission with step 2 data
       result = await query(
         `UPDATE empty_property_submission 
-         SET name = $1, phone = $2, status = 'complete', updated_at = CURRENT_TIMESTAMP 
+         SET property_state = $1, name = $2, status = 'complete', updated_at = CURRENT_TIMESTAMP 
          WHERE id = $3
          RETURNING id, created_at, updated_at`,
-        [sanitizedName, sanitizedPhone, existingCheck.rows[0].id]
+        [sanitizedPropertyState, sanitizedName, existingCheck.rows[0].id]
       )
       // Use created_at from existing record
       result.rows[0].created_at = existingCheck.rows[0].created_at
     } else {
       // Insert new complete submission
       result = await query(
-        `INSERT INTO empty_property_submission (address, property_state, name, phone, status)
+        `INSERT INTO empty_property_submission (address, phone, property_state, name, status)
          VALUES ($1, $2, $3, $4, 'complete')
          RETURNING id, created_at, updated_at`,
-        [sanitizedAddress, sanitizedPropertyState, sanitizedName, sanitizedPhone]
+        [sanitizedAddress, sanitizedPhone, sanitizedPropertyState, sanitizedName]
       )
     }
 

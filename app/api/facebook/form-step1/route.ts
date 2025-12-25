@@ -5,11 +5,11 @@ export async function POST(request: NextRequest) {
   try {
     // Get form data and user agent from request body (sent from client)
     const body = await request.json().catch(() => ({}))
-    const { address, propertyState, name, phone, userAgent, url } = body
+    const { address, phone, userAgent, url } = body
 
-    if (!address || !propertyState) {
+    if (!address || !phone) {
       return NextResponse.json(
-        { error: 'address and propertyState are required' },
+        { error: 'address and phone are required' },
         { status: 400 }
       )
     }
@@ -29,9 +29,7 @@ export async function POST(request: NextRequest) {
     // Send FormStep1 event to Facebook Conversions API
     await sendFormStep1Event(modifiedRequest, {
       address,
-      propertyState,
-      name: name || undefined,
-      phone: phone || undefined,
+      phone,
       userAgent: userAgent || undefined,
     })
     

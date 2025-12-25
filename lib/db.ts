@@ -32,7 +32,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS empty_property_submission (
         id SERIAL PRIMARY KEY,
         address TEXT NOT NULL,
-        property_state TEXT NOT NULL,
+        property_state TEXT,
         name TEXT,
         phone TEXT,
         status TEXT DEFAULT 'partial',
@@ -61,7 +61,7 @@ export async function initializeDatabase() {
       console.log('Column check/add:', alterError.message)
     }
     
-    // Make name and phone nullable for partial submissions
+    // Make name, phone, and property_state nullable for partial submissions
     try {
       await query(`
         ALTER TABLE empty_property_submission 
@@ -75,6 +75,15 @@ export async function initializeDatabase() {
       await query(`
         ALTER TABLE empty_property_submission 
         ALTER COLUMN phone DROP NOT NULL;
+      `)
+    } catch (alterError: any) {
+      // Column might already be nullable or not exist
+    }
+    
+    try {
+      await query(`
+        ALTER TABLE empty_property_submission 
+        ALTER COLUMN property_state DROP NOT NULL;
       `)
     } catch (alterError: any) {
       // Column might already be nullable or not exist

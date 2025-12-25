@@ -13,12 +13,12 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { address, propertyState } = body
+    const { address, phone } = body
 
     // Validate required fields
-    if (!address || !propertyState) {
+    if (!address || !phone) {
       return NextResponse.json(
-        { error: 'Address and property state are required' },
+        { error: 'Address and phone number are required' },
         { status: 400 }
       )
     }
@@ -28,14 +28,14 @@ export async function POST(request: Request) {
 
     // Sanitize inputs
     const sanitizedAddress = address.trim()
-    const sanitizedPropertyState = propertyState.trim()
+    const sanitizedPhone = phone.trim()
 
-    // Check if a partial submission with this address and property_state already exists
+    // Check if a partial submission with this address and phone already exists
     const existingCheck = await query(
       `SELECT id, status FROM empty_property_submission 
-       WHERE address = $1 AND property_state = $2 AND status = 'partial' 
+       WHERE address = $1 AND phone = $2 AND status = 'partial' 
        ORDER BY created_at DESC LIMIT 1`,
-      [sanitizedAddress, sanitizedPropertyState]
+      [sanitizedAddress, sanitizedPhone]
     )
 
     let submissionId: number
@@ -52,10 +52,10 @@ export async function POST(request: Request) {
     } else {
       // Insert new partial submission
       const result = await query(
-        `INSERT INTO empty_property_submission (address, property_state, status)
+        `INSERT INTO empty_property_submission (address, phone, status)
          VALUES ($1, $2, 'partial')
          RETURNING id, created_at`,
-        [sanitizedAddress, sanitizedPropertyState]
+        [sanitizedAddress, sanitizedPhone]
       )
       submissionId = result.rows[0].id
     }
@@ -78,4 +78,5 @@ export async function POST(request: Request) {
     )
   }
 }
+
 
