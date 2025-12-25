@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import Image from 'next/image'
 import { FileText, Clock, Eye, CheckCircle, Shield, Users, EyeOff, Lock, ShieldCheck } from 'lucide-react'
 import StepCard from '../components/StepCard'
@@ -8,8 +11,11 @@ import Accordion from '../components/Accordion'
 import StickyCTA from '../components/StickyCTA'
 import PageViewTracker from '../components/PageViewTracker'
 import ScrollTracker from '../components/ScrollTracker'
+import LegalModal from '../components/LegalModal'
+import { termsContent, privacyContent } from '../data/legal-documents'
 
 export default function EmptyPage() {
+  const [openModal, setOpenModal] = useState<'terms' | 'privacy' | null>(null)
   const propertyTypes = [
     'Probate',
     'Empty',
@@ -282,7 +288,7 @@ export default function EmptyPage() {
       {/* Footer */}
       <footer className="px-4 sm:px-6 lg:px-8 py-12 border-t border-navy-800/50 mt-20 md:mt-32 pb-20 md:pb-12">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-6">
             <div className="text-gray-400 text-sm">
               <p>© {new Date().getFullYear()} Doorly Properties Limited. All rights reserved.</p>
             </div>
@@ -295,8 +301,42 @@ export default function EmptyPage() {
               </a>
             </div>
           </div>
+          <div className="border-t border-navy-800/50 pt-6">
+            <p className="text-gray-400 text-sm text-center mb-4">
+              Offers are subject to property inspection, due diligence and conveyancing. No fees. No obligation.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-6">
+              <button
+                onClick={() => setOpenModal('terms')}
+                className="text-gray-400 hover:text-accent-red transition-colors text-sm underline"
+              >
+                Terms and Conditions
+              </button>
+              <button
+                onClick={() => setOpenModal('privacy')}
+                className="text-gray-400 hover:text-accent-red transition-colors text-sm underline"
+              >
+                Privacy Policy
+              </button>
+            </div>
+          </div>
         </div>
       </footer>
+
+      {/* Legal Modals */}
+      <LegalModal
+        isOpen={openModal === 'terms'}
+        onClose={() => setOpenModal(null)}
+        title="Terms & Conditions"
+        content={termsContent}
+      />
+
+      <LegalModal
+        isOpen={openModal === 'privacy'}
+        onClose={() => setOpenModal(null)}
+        title="Privacy Policy"
+        content={privacyContent}
+      />
 
       {/* Sticky Mobile CTA */}
       <StickyCTA />
