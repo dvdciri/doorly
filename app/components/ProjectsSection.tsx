@@ -38,8 +38,8 @@ export default function ProjectsSection() {
           <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-400 mb-4 sm:mb-6 text-center">
             Made possible by our trusted partners
           </h3>
-          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 md:gap-8 lg:gap-10">
-            <div className="h-10 sm:h-12 md:h-16 w-auto relative">
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+            <div className="h-8 sm:h-10 md:h-12 w-auto relative">
               <Image
                 src="/partners/inca-financial-logo.png"
                 alt="Inca Financial"
@@ -48,7 +48,7 @@ export default function ProjectsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-10 sm:h-12 md:h-16 w-auto relative">
+            <div className="h-8 sm:h-10 md:h-12 w-auto relative">
               <Image
                 src="/partners/glaisyers-logo.png"
                 alt="Glaisyers"
@@ -57,7 +57,7 @@ export default function ProjectsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-10 sm:h-12 md:h-16 w-auto relative">
+            <div className="h-8 sm:h-10 md:h-12 w-auto relative">
               <Image
                 src="/partners/partner3.png"
                 alt="Partner"
@@ -66,7 +66,7 @@ export default function ProjectsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-10 sm:h-12 md:h-16 w-auto relative">
+            <div className="h-8 sm:h-10 md:h-12 w-auto relative">
               <Image
                 src="/partners/wards-logo.png"
                 alt="Wards Property"
@@ -75,7 +75,7 @@ export default function ProjectsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-10 sm:h-12 md:h-16 w-auto relative">
+            <div className="h-8 sm:h-10 md:h-12 w-auto relative">
               <Image
                 src="/partners/oranges-logo.png"
                 alt="Oranges Sales and Lettings"
@@ -84,7 +84,7 @@ export default function ProjectsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-10 sm:h-12 md:h-16 w-auto relative">
+            <div className="h-8 sm:h-10 md:h-12 w-auto relative">
               <Image
                 src="/partners/bernards-logo.png"
                 alt="Bernards Estates"

@@ -28,7 +28,7 @@ export default function Hero() {
           {/* Team Image */}
           <div className="order-1 lg:order-2 relative h-64 sm:h-80 md:h-96 lg:h-[450px] w-full rounded-lg overflow-hidden shadow-2xl">
             <Image
-              src="/hero.jpeg"
+              src="/hero.jpg"
               alt="Doorly Properties team"
               fill
               className="object-cover"

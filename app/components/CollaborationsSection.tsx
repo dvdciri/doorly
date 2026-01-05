@@ -8,8 +8,8 @@ export default function CollaborationsSection() {
           <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-400 mb-6 sm:mb-8 text-center">
             Made possible by our trusted partners
           </h3>
-          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 md:gap-10 lg:gap-12">
-            <div className="h-12 sm:h-16 md:h-20 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 md:gap-8 lg:gap-10">
+            <div className="h-10 sm:h-12 md:h-16 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
               <Image
                 src="/partners/inca-financial-logo.png"
                 alt="Inca Financial"
@@ -18,7 +18,7 @@ export default function CollaborationsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-12 sm:h-16 md:h-20 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
+            <div className="h-10 sm:h-12 md:h-16 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
               <Image
                 src="/partners/glaisyers-logo.png"
                 alt="Glaisyers"
@@ -27,7 +27,7 @@ export default function CollaborationsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-12 sm:h-16 md:h-20 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
+            <div className="h-10 sm:h-12 md:h-16 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
               <Image
                 src="/partners/partner3.png"
                 alt="Partner"
@@ -36,7 +36,7 @@ export default function CollaborationsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-12 sm:h-16 md:h-20 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
+            <div className="h-10 sm:h-12 md:h-16 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
               <Image
                 src="/partners/wards-logo.png"
                 alt="Wards Property"
@@ -45,7 +45,7 @@ export default function CollaborationsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-12 sm:h-16 md:h-20 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
+            <div className="h-10 sm:h-12 md:h-16 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
               <Image
                 src="/partners/oranges-logo.png"
                 alt="Oranges Sales and Lettings"
@@ -54,7 +54,7 @@ export default function CollaborationsSection() {
                 className="h-full w-auto object-contain"
               />
             </div>
-            <div className="h-12 sm:h-16 md:h-20 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
+            <div className="h-10 sm:h-12 md:h-16 w-auto relative opacity-70 hover:opacity-100 transition-opacity">
               <Image
                 src="/partners/bernards-logo.png"
                 alt="Bernards Estates"
