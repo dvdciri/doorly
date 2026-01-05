@@ -112,6 +112,105 @@ export async function sendFormSubmissionEmail(data: FormSubmissionData): Promise
   }
 }
 
+interface PortfolioSubmissionData {
+  name: string
+  phone: string
+  propertyCount: string
+  submittedAt: Date
+}
+
+export async function sendPortfolioSubmissionEmail(data: PortfolioSubmissionData): Promise<void> {
+  // Check if Resend API key is configured
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Email notification skipped.')
+    return
+  }
+
+  // Check if notification email is configured
+  const notificationEmail = process.env.NOTIFICATION_EMAIL
+  if (!notificationEmail) {
+    console.warn('NOTIFICATION_EMAIL is not set. Email notification skipped.')
+    return
+  }
+
+  // Format date/time
+  const formattedDate = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(data.submittedAt)
+
+  try {
+    await resend.emails.send({
+      from: 'Doorly Properties <onboarding@resend.dev>',
+      to: notificationEmail,
+      subject: `New Portfolio Submission - ${data.name}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>New Portfolio Submission</title>
+          </head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+            <div style="background-color: #ffffff; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <h1 style="color: #ea4b4b; margin-top: 0; font-size: 24px; border-bottom: 2px solid #ea4b4b; padding-bottom: 10px;">
+                New Portfolio Submission
+              </h1>
+              
+              <div style="margin-top: 30px;">
+                <h2 style="color: #102a43; font-size: 18px; margin-bottom: 15px;">Portfolio Details</h2>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 10px 0; font-weight: 600; color: #486581; width: 180px;">Property Count:</td>
+                    <td style="padding: 10px 0; color: #102a43;">${escapeHtml(data.propertyCount)}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="margin-top: 30px;">
+                <h2 style="color: #102a43; font-size: 18px; margin-bottom: 15px;">Contact Information</h2>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 10px 0; font-weight: 600; color: #486581; width: 180px;">Name:</td>
+                    <td style="padding: 10px 0; color: #102a43;">${escapeHtml(data.name)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px 0; font-weight: 600; color: #486581;">Phone:</td>
+                    <td style="padding: 10px 0; color: #102a43;">
+                      <a href="tel:${escapeHtml(data.phone)}" style="color: #ea4b4b; text-decoration: none;">${escapeHtml(data.phone)}</a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                <p style="color: #627d98; font-size: 14px; margin: 0;">
+                  Submitted on: <strong>${formattedDate}</strong>
+                </p>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; color: #627d98; font-size: 12px;">
+              <p>This is an automated notification from Doorly Properties</p>
+            </div>
+          </body>
+        </html>
+      `,
+    })
+
+    console.log('Portfolio email notification sent successfully')
+  } catch (error: any) {
+    // Log error but don't throw - we don't want email failures to break form submission
+    console.error('Failed to send portfolio email notification:', error.message || error)
+    throw error // Re-throw so caller can decide how to handle
+  }
+}
+
 // Helper function to escape HTML to prevent XSS
 function escapeHtml(text: string): string {
   const map: { [key: string]: string } = {

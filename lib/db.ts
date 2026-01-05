@@ -150,5 +150,45 @@ export async function initializeDatabase() {
   }
 }
 
+// Initialize portfolio submission database table
+export async function initializePortfolioDatabase() {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS portfolio_submission (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        property_count TEXT NOT NULL,
+        status TEXT DEFAULT 'complete',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+    
+    // Add updated_at column if it doesn't exist (for existing tables)
+    try {
+      const updatedAtCheck = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'portfolio_submission' 
+        AND column_name = 'updated_at';
+      `)
+      
+      if (updatedAtCheck.rows.length === 0) {
+        await query(`
+          ALTER TABLE portfolio_submission 
+          ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        `)
+        console.log('Added updated_at column to portfolio_submission table')
+      }
+    } catch (alterError: any) {
+      console.log('Updated_at column check/add for portfolio_submission:', alterError.message)
+    }
+  } catch (error: any) {
+    console.error('Error initializing portfolio database:', error)
+    throw error
+  }
+}
+
 export default pool
 

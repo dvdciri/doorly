@@ -14,6 +14,7 @@ interface LeadEventData {
   name?: string
   address?: string
   propertyState?: string
+  propertyCount?: string
   userAgent?: string
   ipAddress?: string
   eventId?: string
@@ -204,6 +205,7 @@ export async function sendLeadEvent(
         content_category: 'Lead Form',
         address: data.address || undefined,
         property_state: data.propertyState || undefined,
+        property_count: data.propertyCount || undefined,
         name: data.name || undefined,
         phone: data.phone || undefined,
       },

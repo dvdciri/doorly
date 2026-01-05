@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 import { resolve } from 'path'
-import { initializeDatabase } from '../lib/db'
+import { initializeDatabase, initializePortfolioDatabase } from '../lib/db'
 
 // Load environment variables from .env.local or .env
 config({ path: resolve(process.cwd(), '.env.local') })
@@ -18,6 +18,8 @@ async function main() {
 
     console.log('Initializing database...')
     await initializeDatabase()
+    console.log('Initializing portfolio database...')
+    await initializePortfolioDatabase()
     console.log('✅ Database initialized successfully!')
     process.exit(0)
   } catch (error: any) {

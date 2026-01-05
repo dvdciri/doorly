@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { FileText, Clock, Eye, CheckCircle, Shield, Users, EyeOff, Lock, ShieldCheck } from 'lucide-react'
 import StepCard from '../components/StepCard'
 import PropertyTypeCard from '../components/PropertyTypeCard'
-import HeroForm from '../components/HeroForm'
+import PortfolioForm from '../components/PortfolioForm'
 import BenefitCard from '../components/BenefitCard'
 import Accordion from '../components/Accordion'
 import StickyCTA from '../components/StickyCTA'
@@ -14,7 +14,7 @@ import ScrollTracker from '../components/ScrollTracker'
 import LegalModal from '../components/LegalModal'
 import { termsContent, privacyContent } from '../data/legal-documents'
 
-export default function EmptyPage() {
+export default function MufbPortfolioPage() {
   const [openModal, setOpenModal] = useState<'terms' | 'privacy' | null>(null)
   const propertyTypes = [
     'Probate',
@@ -50,6 +50,10 @@ export default function EmptyPage() {
       question: 'Are there any fees or hidden costs?',
       answer: 'No. There are no estate agent fees, no listing costs, and no hidden charges at any stage.',
     },
+    {
+      question: 'Can you buy all my properties at once if I own more than one?',
+      answer: "Yes, absolutely. We specialize in purchasing entire property portfolios and can buy all your properties in a single transaction. This simplifies the process significantly, allowing you to exit property ownership completely with one streamlined sale. Whether you own multiple individual properties or a single block or mixed-use building, we can structure a deal that works for your entire portfolio. This approach eliminates the complexity of multiple sales and provides a clean exit from property ownership.",
+    },
   ]
 
   return (
@@ -71,17 +75,17 @@ export default function EmptyPage() {
               />
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-50 mb-4 md:mb-6 leading-tight px-2">
-              A simpler way to sell your{' '}
-              <span className="text-accent-red">house</span>
+              A simpler way to exit your{' '}
+              <span className="text-accent-red">property journey</span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed px-2">
-              Sell directly to a cash buyer, in your property's current condition, with no agents, no fees, and no obligation.
+              For landlords facing rising regulation, tenant challenges, and the day-to-day burden of managing property portfolios.
             </p>
           </div>
 
           {/* Hero Form */}
           <div className="mb-8">
-            <HeroForm />
+            <PortfolioForm />
           </div>
 
           {/* Trust Band */}
@@ -113,23 +117,23 @@ export default function EmptyPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <StepCard
                 stepNumber={1}
-                title="Submit property details"
-                description="Tell us about your property using our simple form."
+                title="Submit your details"
+                description="Share a few basic details about you and the properties you're considering selling."
               />
               <StepCard
                 stepNumber={2}
-                title="Receive initial offer"
-                description="Get a price offer range within 48 hours, with no obligation."
+                title="We'll be in touch"
+                description="We'll contact you to discuss your situation, outline an initial price range, and understand what matters most to you."
               />
               <StepCard
                 stepNumber={3}
-                title="Arrange a viewing"
-                description="If you're happy with the offer, we'll arrange a convenient viewing."
+                title="Arrange a viewing or share photos"
+                description="If it makes sense to proceed, we'll arrange a viewing — or review videos and photos where more convenient."
               />
               <StepCard
                 stepNumber={4}
-                title="Receive official offer"
-                description="After the viewing, receive your final cash offer with complete flexibility."
+                title="Receive your official offer"
+                description="Following our review, you'll receive a clear, no-obligation offer with flexible completion options."
               />
             </div>
           </div>
