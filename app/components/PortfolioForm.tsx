@@ -159,7 +159,7 @@ export default function PortfolioForm() {
               onChange={handleChange}
               className="w-full pl-4 pr-12 py-3.5 min-h-[48px] bg-navy-800/50 border border-navy-700 rounded-xl text-gray-50 focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none transition text-base sm:text-lg"
             >
-              <option value="">How many properties are you considering selling? (Optional)</option>
+              <option value="">How many properties do you own?</option>
               <option value="1–3">1–3</option>
               <option value="4–10">4–10</option>
               <option value="10+">10+</option>
