@@ -116,9 +116,14 @@ export async function sendPageViewEvent(
       data: [eventData],
     }
 
+    // Build URL with optional test event code
+    const testEventCode = process.env.FACEBOOK_TEST_EVENT_CODE
+    const baseUrl = `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`
+    const url = testEventCode ? `${baseUrl}&test_event_code=${testEventCode}` : baseUrl
+
     // Send to Facebook Conversions API
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`,
+      url,
       {
         method: 'POST',
         headers: {
@@ -216,9 +221,14 @@ export async function sendLeadEvent(
       data: [eventData],
     }
 
+    // Build URL with optional test event code
+    const testEventCode = process.env.FACEBOOK_TEST_EVENT_CODE
+    const baseUrl = `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`
+    const url = testEventCode ? `${baseUrl}&test_event_code=${testEventCode}` : baseUrl
+
     // Send to Facebook Conversions API
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`,
+      url,
       {
         method: 'POST',
         headers: {
@@ -287,9 +297,14 @@ export async function sendScrollEvent(
       data: [eventData],
     }
 
+    // Build URL with optional test event code
+    const testEventCode = process.env.FACEBOOK_TEST_EVENT_CODE
+    const baseUrl = `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`
+    const url = testEventCode ? `${baseUrl}&test_event_code=${testEventCode}` : baseUrl
+
     // Send to Facebook Conversions API
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`,
+      url,
       {
         method: 'POST',
         headers: {
@@ -365,9 +380,14 @@ export async function sendFormStep1Event(
       data: [eventData],
     }
 
+    // Build URL with optional test event code
+    const testEventCode = process.env.FACEBOOK_TEST_EVENT_CODE
+    const baseUrl = `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`
+    const url = testEventCode ? `${baseUrl}&test_event_code=${testEventCode}` : baseUrl
+
     // Send to Facebook Conversions API
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`,
+      url,
       {
         method: 'POST',
         headers: {

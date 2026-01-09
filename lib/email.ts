@@ -115,7 +115,7 @@ export async function sendFormSubmissionEmail(data: FormSubmissionData): Promise
 interface PortfolioSubmissionData {
   name: string
   phone: string
-  propertyCount: string
+  propertyCount?: string
   submittedAt: Date
 }
 
@@ -162,6 +162,7 @@ export async function sendPortfolioSubmissionEmail(data: PortfolioSubmissionData
                 New Portfolio Submission
               </h1>
               
+              ${data.propertyCount ? `
               <div style="margin-top: 30px;">
                 <h2 style="color: #102a43; font-size: 18px; margin-bottom: 15px;">Portfolio Details</h2>
                 <table style="width: 100%; border-collapse: collapse;">
@@ -171,6 +172,7 @@ export async function sendPortfolioSubmissionEmail(data: PortfolioSubmissionData
                   </tr>
                 </table>
               </div>
+              ` : ''}
 
               <div style="margin-top: 30px;">
                 <h2 style="color: #102a43; font-size: 18px; margin-bottom: 15px;">Contact Information</h2>
@@ -212,7 +214,8 @@ export async function sendPortfolioSubmissionEmail(data: PortfolioSubmissionData
 }
 
 // Helper function to escape HTML to prevent XSS
-function escapeHtml(text: string): string {
+function escapeHtml(text: string | undefined | null): string {
+  if (!text) return ''
   const map: { [key: string]: string } = {
     '&': '&amp;',
     '<': '&lt;',

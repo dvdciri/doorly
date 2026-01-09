@@ -3,19 +3,10 @@ import { query, initializePortfolioDatabase } from '@/lib/db'
 import { sendPortfolioSubmissionEmail } from '@/lib/email'
 import { sendLeadEvent } from '@/lib/facebook-conversions'
 
-// Validate UK phone number
-function validateUKPhone(phone: string): boolean {
-  const cleaned = phone.replace(/[\s\-\(\)\+]/g, '')
-  
-  if (cleaned.startsWith('44')) {
-    const digits = cleaned.substring(2)
-    return /^\d{10}$/.test(digits)
-  } else if (cleaned.startsWith('0')) {
-    const digits = cleaned.substring(1)
-    return /^\d{10}$/.test(digits)
-  }
-  
-  return /^\d{10}$/.test(cleaned)
+// Check if phone number is complete (has enough digits)
+function isPhoneComplete(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '') // Extract only digits
+  return digits.length >= 10 // At least 10 digits required
 }
 
 export async function POST(request: Request) {
@@ -33,17 +24,17 @@ export async function POST(request: Request) {
     const { name, phone, propertyCount } = body
 
     // Validate required fields
-    if (!name || !phone || !propertyCount) {
+    if (!name || !phone) {
       return NextResponse.json(
-        { error: 'Name, phone number, and property count are required' },
+        { error: 'Name and phone number are required' },
         { status: 400 }
       )
     }
 
-    // Validate phone number format
-    if (!validateUKPhone(phone)) {
+    // Validate phone number is complete
+    if (!isPhoneComplete(phone)) {
       return NextResponse.json(
-        { error: 'Please enter a valid UK phone number' },
+        { error: 'Please enter a complete phone number' },
         { status: 400 }
       )
     }
@@ -54,7 +45,7 @@ export async function POST(request: Request) {
     // Sanitize inputs
     const sanitizedName = name.trim()
     const sanitizedPhone = phone.trim()
-    const sanitizedPropertyCount = propertyCount.trim()
+    const sanitizedPropertyCount = propertyCount ? propertyCount.trim() : null
 
     // Insert new submission
     const result = await query(
@@ -69,7 +60,7 @@ export async function POST(request: Request) {
       await sendPortfolioSubmissionEmail({
         name: sanitizedName,
         phone: sanitizedPhone,
-        propertyCount: sanitizedPropertyCount,
+        propertyCount: sanitizedPropertyCount || undefined,
         submittedAt: new Date(result.rows[0].created_at),
       })
     } catch (emailError: any) {
@@ -82,7 +73,7 @@ export async function POST(request: Request) {
       await sendLeadEvent(request, {
         phone: sanitizedPhone,
         name: sanitizedName,
-        propertyCount: sanitizedPropertyCount,
+        propertyCount: sanitizedPropertyCount || undefined,
       })
     } catch (fbError: any) {
       // Log error but don't fail the form submission

@@ -13,21 +13,11 @@ async function ensureDatabaseInitialized() {
   }
 }
 
-// Validate UK phone number
-function validateUKPhone(phone: string): boolean {
-  const cleaned = phone.replace(/[\s\-\(\)\+]/g, '')
-  
-  if (cleaned.startsWith('44')) {
-    const digits = cleaned.substring(2)
-    return /^\d{10}$/.test(digits)
-  } else if (cleaned.startsWith('0')) {
-    const digits = cleaned.substring(1)
-    return /^\d{10}$/.test(digits)
-  }
-  
-  return /^\d{10}$/.test(cleaned)
+// Check if phone number is complete (has enough digits)
+function isPhoneComplete(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '') // Extract only digits
+  return digits.length >= 10 // At least 10 digits required
 }
-
 
 export async function POST(request: Request) {
   try {
@@ -47,6 +37,14 @@ export async function POST(request: Request) {
     if (!address || !phone || !propertyState || !name) {
       return NextResponse.json(
         { error: 'Address, phone number, property state, and name are required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate phone number is complete
+    if (!isPhoneComplete(phone)) {
+      return NextResponse.json(
+        { error: 'Please enter a complete phone number' },
         { status: 400 }
       )
     }

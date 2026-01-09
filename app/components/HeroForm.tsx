@@ -25,26 +25,11 @@ export default function HeroForm() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  // Validate UK phone number
-  const validateUKPhone = (phone: string): boolean => {
-    // Remove all spaces, dashes, parentheses, and plus signs for validation
-    const cleaned = phone.replace(/[\s\-\(\)\+]/g, '')
-    
-    // Check if it starts with 0 or 44
-    if (cleaned.startsWith('44')) {
-      // International format: +44 followed by 10 digits
-      const digits = cleaned.substring(2)
-      return /^\d{10}$/.test(digits)
-    } else if (cleaned.startsWith('0')) {
-      // UK format: 0 followed by 10 digits
-      const digits = cleaned.substring(1)
-      return /^\d{10}$/.test(digits)
-    }
-    
-    // If it doesn't start with 0 or 44, check if it's exactly 10 digits
-    return /^\d{10}$/.test(cleaned)
+  // Check if phone number is complete (has enough digits)
+  const isPhoneComplete = (phone: string): boolean => {
+    const digits = phone.replace(/\D/g, '') // Extract only digits
+    return digits.length >= 10 // At least 10 digits required
   }
-
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,15 +43,15 @@ export default function HeroForm() {
 
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required'
-    } else if (!validateUKPhone(formData.phone)) {
-      newErrors.phone = 'Please enter a valid UK phone number (e.g., 07123 456789 or +44 7123 456789)'
+    } else if (!isPhoneComplete(formData.phone)) {
+      newErrors.phone = 'Please enter a complete phone number'
     } else {
       newErrors.phone = ''
     }
 
     setErrors(newErrors)
 
-    if (formData.address.trim() && formData.phone.trim() && validateUKPhone(formData.phone)) {
+    if (formData.address.trim() && formData.phone.trim() && isPhoneComplete(formData.phone)) {
       // Save step 1 data to database (partial submission)
       fetch('/api/submit-step1', {
         method: 'POST',

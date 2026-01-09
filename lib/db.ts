@@ -158,12 +158,24 @@ export async function initializePortfolioDatabase() {
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         phone TEXT NOT NULL,
-        property_count TEXT NOT NULL,
+        property_count TEXT,
         status TEXT DEFAULT 'complete',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `)
+    
+    // Make property_count nullable for existing tables
+    try {
+      await query(`
+        ALTER TABLE portfolio_submission 
+        ALTER COLUMN property_count DROP NOT NULL;
+      `)
+      console.log('Made property_count nullable in portfolio_submission table')
+    } catch (alterError: any) {
+      // Column might already be nullable or constraint doesn't exist
+      console.log('Property_count nullable check:', alterError.message)
+    }
     
     // Add updated_at column if it doesn't exist (for existing tables)
     try {
