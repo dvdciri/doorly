@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { query, initializePortfolioDatabase } from '@/lib/db'
 import { sendPortfolioSubmissionEmail } from '@/lib/email'
 import { sendLeadEvent } from '@/lib/facebook-conversions'
+import { sendPortfolioLeadToNotion } from '@/lib/notion'
 
 // Check if phone number is complete (has enough digits)
 function isPhoneComplete(phone: string): boolean {
@@ -78,6 +79,18 @@ export async function POST(request: Request) {
     } catch (fbError: any) {
       // Log error but don't fail the form submission
       console.error('Facebook Conversions API Lead event failed, but form submission succeeded:', fbError.message || fbError)
+    }
+
+    // Send lead to Notion database (don't fail form submission if this fails)
+    try {
+      await sendPortfolioLeadToNotion(
+        sanitizedName,
+        sanitizedPhone,
+        sanitizedPropertyCount
+      )
+    } catch (notionError: any) {
+      // Log error but don't fail the form submission
+      console.error('Notion API failed, but form submission succeeded:', notionError.message || notionError)
     }
 
     return NextResponse.json(
