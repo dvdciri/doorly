@@ -82,8 +82,9 @@ export async function POST(request: Request) {
     }
 
     // Send lead to Notion database (don't fail form submission if this fails)
+    let notionPageId: string | null = null
     try {
-      await sendPortfolioLeadToNotion(
+      notionPageId = await sendPortfolioLeadToNotion(
         sanitizedName,
         sanitizedPhone,
         sanitizedPropertyCount
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
         success: true,
         message: 'Submission received successfully',
         id: result.rows[0].id,
+        notionPageId: notionPageId,
       },
       { status: 201 }
     )

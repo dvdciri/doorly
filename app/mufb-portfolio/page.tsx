@@ -16,6 +16,7 @@ import { termsContent, privacyContent } from '../data/legal-documents'
 
 export default function MufbPortfolioPage() {
   const [openModal, setOpenModal] = useState<'terms' | 'privacy' | null>(null)
+  const [isFormSubmitted, setIsFormSubmitted] = useState(false)
   const propertyTypes = [
     'Probate',
     'Tenanted',
@@ -74,18 +75,22 @@ export default function MufbPortfolioPage() {
                 priority
               />
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-50 mb-4 md:mb-6 leading-tight px-2">
-              A simpler way to exit your{' '}
-              <span className="text-accent-red">property journey</span>
-            </h1>
-            <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed px-2">
-              For landlords facing rising regulation, tenant challenges, and the day-to-day burden of managing property portfolios.
-            </p>
+            {!isFormSubmitted && (
+              <>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-50 mb-4 md:mb-6 leading-tight px-2">
+                  A simpler way to exit your{' '}
+                  <span className="text-accent-red">property journey</span>
+                </h1>
+                <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed px-2">
+                  For landlords facing rising regulation, tenant challenges, and the day-to-day burden of managing property portfolios.
+                </p>
+              </>
+            )}
           </div>
 
           {/* Hero Form */}
           <div className="mb-8">
-            <PortfolioForm />
+            <PortfolioForm onSubmitted={() => setIsFormSubmitted(true)} />
           </div>
 
           {/* Trust Band */}

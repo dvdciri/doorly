@@ -196,6 +196,26 @@ export async function initializePortfolioDatabase() {
     } catch (alterError: any) {
       console.log('Updated_at column check/add for portfolio_submission:', alterError.message)
     }
+    
+    // Add additional_info column if it doesn't exist (for existing tables)
+    try {
+      const additionalInfoCheck = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'portfolio_submission' 
+        AND column_name = 'additional_info';
+      `)
+      
+      if (additionalInfoCheck.rows.length === 0) {
+        await query(`
+          ALTER TABLE portfolio_submission 
+          ADD COLUMN additional_info TEXT;
+        `)
+        console.log('Added additional_info column to portfolio_submission table')
+      }
+    } catch (alterError: any) {
+      console.log('Additional_info column check/add for portfolio_submission:', alterError.message)
+    }
   } catch (error: any) {
     console.error('Error initializing portfolio database:', error)
     throw error
