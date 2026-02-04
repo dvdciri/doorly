@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ChevronRight, CheckCircle } from 'lucide-react'
+import { validateUKPhone, normalizeUKPhone } from '@/lib/phone'
 
 interface PortfolioFormProps {
   onSubmitted?: () => void
@@ -30,12 +31,6 @@ export default function PortfolioForm({ onSubmitted }: PortfolioFormProps) {
   const [commentError, setCommentError] = useState('')
   const [hasSubmittedAdditionalInfo, setHasSubmittedAdditionalInfo] = useState(false)
 
-  // Check if phone number is complete (has enough digits)
-  const isPhoneComplete = (phone: string): boolean => {
-    const digits = phone.replace(/\D/g, '') // Extract only digits
-    return digits.length >= 10 // At least 10 digits required
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitError('')
@@ -56,8 +51,8 @@ export default function PortfolioForm({ onSubmitted }: PortfolioFormProps) {
     // Validate phone
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required'
-    } else if (!isPhoneComplete(formData.phone)) {
-      newErrors.phone = 'Please enter a complete phone number'
+    } else if (!validateUKPhone(formData.phone)) {
+      newErrors.phone = 'Please enter a valid UK phone number'
     } else {
       newErrors.phone = ''
     }
@@ -69,6 +64,12 @@ export default function PortfolioForm({ onSubmitted }: PortfolioFormProps) {
       setIsSubmitting(true)
       
       try {
+        // Normalize phone number before submission
+        const normalizedPhone = normalizeUKPhone(formData.phone.trim())
+        if (!normalizedPhone) {
+          throw new Error('Invalid phone number format')
+        }
+
         const response = await fetch('/api/submit-portfolio-form', {
           method: 'POST',
           headers: {
@@ -76,7 +77,7 @@ export default function PortfolioForm({ onSubmitted }: PortfolioFormProps) {
           },
           body: JSON.stringify({
             name: formData.name.trim(),
-            phone: formData.phone.trim(),
+            phone: normalizedPhone,
             propertyCount: formData.propertyCount.trim() || undefined,
           }),
         })

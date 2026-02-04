@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { query, initializeDatabase } from '@/lib/db'
+import { validateUKPhone, normalizeUKPhone } from '@/lib/phone'
 
 export async function POST(request: Request) {
   try {
@@ -23,12 +24,28 @@ export async function POST(request: Request) {
       )
     }
 
+    // Validate and normalize UK phone number
+    if (!validateUKPhone(phone)) {
+      return NextResponse.json(
+        { error: 'Please enter a valid UK phone number' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedPhone = normalizeUKPhone(phone.trim())
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { error: 'Please enter a valid UK phone number' },
+        { status: 400 }
+      )
+    }
+
     // Ensure table exists before inserting (creates table if it doesn't exist)
     await initializeDatabase()
 
     // Sanitize inputs
     const sanitizedAddress = address.trim()
-    const sanitizedPhone = phone.trim()
+    const sanitizedPhone = normalizedPhone // Use normalized phone number
 
     // Check if a partial submission with this address and phone already exists
     const existingCheck = await query(

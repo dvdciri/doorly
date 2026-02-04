@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import ConfirmationDialog from './ConfirmationDialog'
+import { validateUKPhone, normalizeUKPhone } from '@/lib/phone'
 
 export default function HeroForm() {
   const [step, setStep] = useState(1)
@@ -25,12 +26,6 @@ export default function HeroForm() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  // Check if phone number is complete (has enough digits)
-  const isPhoneComplete = (phone: string): boolean => {
-    const digits = phone.replace(/\D/g, '') // Extract only digits
-    return digits.length >= 10 // At least 10 digits required
-  }
-
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault()
     const newErrors = { ...errors }
@@ -43,15 +38,23 @@ export default function HeroForm() {
 
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required'
-    } else if (!isPhoneComplete(formData.phone)) {
-      newErrors.phone = 'Please enter a complete phone number'
+    } else if (!validateUKPhone(formData.phone)) {
+      newErrors.phone = 'Please enter a valid UK phone number'
     } else {
       newErrors.phone = ''
     }
 
     setErrors(newErrors)
 
-    if (formData.address.trim() && formData.phone.trim() && isPhoneComplete(formData.phone)) {
+    if (formData.address.trim() && formData.phone.trim() && validateUKPhone(formData.phone)) {
+      // Normalize phone number before submission
+      const normalizedPhone = normalizeUKPhone(formData.phone.trim())
+      if (!normalizedPhone) {
+        newErrors.phone = 'Please enter a valid UK phone number'
+        setErrors(newErrors)
+        return
+      }
+
       // Save step 1 data to database (partial submission)
       fetch('/api/submit-step1', {
         method: 'POST',
@@ -60,7 +63,7 @@ export default function HeroForm() {
         },
         body: JSON.stringify({
           address: formData.address.trim(),
-          phone: formData.phone.trim(),
+          phone: normalizedPhone,
         }),
       }).catch((error) => {
         // Fail silently - don't break user experience
@@ -75,7 +78,7 @@ export default function HeroForm() {
         },
         body: JSON.stringify({
           address: formData.address.trim(),
-          phone: formData.phone.trim(),
+          phone: normalizedPhone,
           userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined,
           url: typeof window !== 'undefined' ? window.location.href : undefined,
         }),
@@ -119,6 +122,12 @@ export default function HeroForm() {
       setIsSubmitting(true)
       
       try {
+        // Normalize phone number before submission
+        const normalizedPhone = normalizeUKPhone(formData.phone.trim())
+        if (!normalizedPhone) {
+          throw new Error('Invalid phone number format')
+        }
+
         const response = await fetch('/api/submit-form', {
           method: 'POST',
           headers: {
@@ -126,7 +135,7 @@ export default function HeroForm() {
           },
           body: JSON.stringify({
             address: formData.address.trim(),
-            phone: formData.phone.trim(),
+            phone: normalizedPhone,
             propertyState: formData.propertyState.trim(),
             name: formData.name.trim(),
           }),

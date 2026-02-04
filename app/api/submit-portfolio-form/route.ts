@@ -3,12 +3,7 @@ import { query, initializePortfolioDatabase } from '@/lib/db'
 import { sendPortfolioSubmissionEmail } from '@/lib/email'
 import { sendLeadEvent } from '@/lib/facebook-conversions'
 import { sendPortfolioLeadToNotion } from '@/lib/notion'
-
-// Check if phone number is complete (has enough digits)
-function isPhoneComplete(phone: string): boolean {
-  const digits = phone.replace(/\D/g, '') // Extract only digits
-  return digits.length >= 10 // At least 10 digits required
-}
+import { validateUKPhone, normalizeUKPhone } from '@/lib/phone'
 
 export async function POST(request: Request) {
   try {
@@ -32,10 +27,18 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validate phone number is complete
-    if (!isPhoneComplete(phone)) {
+    // Validate and normalize UK phone number
+    if (!validateUKPhone(phone)) {
       return NextResponse.json(
-        { error: 'Please enter a complete phone number' },
+        { error: 'Please enter a valid UK phone number' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedPhone = normalizeUKPhone(phone.trim())
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { error: 'Please enter a valid UK phone number' },
         { status: 400 }
       )
     }
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
 
     // Sanitize inputs
     const sanitizedName = name.trim()
-    const sanitizedPhone = phone.trim()
+    const sanitizedPhone = normalizedPhone // Use normalized phone number
     const sanitizedPropertyCount = propertyCount ? propertyCount.trim() : null
 
     // Insert new submission

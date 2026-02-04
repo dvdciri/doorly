@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { validateUKPhone, normalizeUKPhone } from '@/lib/phone'
 
 export default function LeadForm() {
   const [formData, setFormData] = useState({
@@ -12,12 +13,33 @@ export default function LeadForm() {
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [phoneError, setPhoneError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setPhoneError('')
+
+    // Validate phone number
+    if (!formData.phone.trim()) {
+      setPhoneError('Phone number is required')
+      return
+    } else if (!validateUKPhone(formData.phone)) {
+      setPhoneError('Please enter a valid UK phone number')
+      return
+    }
+
     setIsSubmitting(true)
+    
+    // Normalize phone number before submission
+    const normalizedPhone = normalizeUKPhone(formData.phone.trim())
+    if (!normalizedPhone) {
+      setPhoneError('Please enter a valid UK phone number')
+      setIsSubmitting(false)
+      return
+    }
+
     // TODO: Implement form submission logic
-    console.log('Form submitted:', formData)
+    console.log('Form submitted:', { ...formData, phone: normalizedPhone })
     setTimeout(() => {
       setIsSubmitting(false)
       alert('Thank you for your submission. We will be in touch within 48 hours.')
@@ -29,6 +51,11 @@ export default function LeadForm() {
       ...formData,
       [e.target.name]: e.target.value,
     })
+    
+    // Clear phone error when user starts typing
+    if (e.target.name === 'phone' && phoneError) {
+      setPhoneError('')
+    }
   }
 
   return (
@@ -116,9 +143,14 @@ export default function LeadForm() {
             value={formData.phone}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent outline-none transition"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent outline-none transition ${
+              phoneError ? 'border-red-500' : 'border-gray-300'
+            }`}
             placeholder="07123 456789"
           />
+          {phoneError && (
+            <p className="mt-1 text-sm text-red-500">{phoneError}</p>
+          )}
         </div>
 
         <button

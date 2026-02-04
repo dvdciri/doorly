@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { query, initializeDatabase } from '@/lib/db'
 import { sendFormSubmissionEmail } from '@/lib/email'
 import { sendLeadEvent } from '@/lib/facebook-conversions'
+import { validateUKPhone, normalizeUKPhone } from '@/lib/phone'
 
 // Initialize database on first import
 let dbInitialized = false
@@ -11,12 +12,6 @@ async function ensureDatabaseInitialized() {
     await initializeDatabase()
     dbInitialized = true
   }
-}
-
-// Check if phone number is complete (has enough digits)
-function isPhoneComplete(phone: string): boolean {
-  const digits = phone.replace(/\D/g, '') // Extract only digits
-  return digits.length >= 10 // At least 10 digits required
 }
 
 export async function POST(request: Request) {
@@ -41,10 +36,18 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validate phone number is complete
-    if (!isPhoneComplete(phone)) {
+    // Validate and normalize UK phone number
+    if (!validateUKPhone(phone)) {
       return NextResponse.json(
-        { error: 'Please enter a complete phone number' },
+        { error: 'Please enter a valid UK phone number' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedPhone = normalizeUKPhone(phone.trim())
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { error: 'Please enter a valid UK phone number' },
         { status: 400 }
       )
     }
@@ -54,7 +57,7 @@ export async function POST(request: Request) {
 
     // Sanitize inputs (basic sanitization - PostgreSQL parameterized queries handle SQL injection)
     const sanitizedAddress = address.trim()
-    const sanitizedPhone = phone.trim()
+    const sanitizedPhone = normalizedPhone // Use normalized phone number
     const sanitizedPropertyState = propertyState.trim()
     const sanitizedName = name.trim()
 
