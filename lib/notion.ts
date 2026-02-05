@@ -65,7 +65,7 @@ export async function sendPortfolioLeadToNotion(
       parent: { database_id: databaseId },
       properties: {
         // Stage field (select)
-        Stage: { select: { name: 'Lead' } },
+        Stage: { select: { name: 'New Lead' } },
         // Name field (title) - using person name
         Name: { title: [{ text: { content: name } }] },
         // Contact number field (rich_text)
