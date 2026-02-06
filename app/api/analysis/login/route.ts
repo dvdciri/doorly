@@ -35,6 +35,15 @@ export async function POST(request: Request) {
       )
     }
 
+    // Ensure COOKIE_SECRET is configured
+    if (!COOKIE_SECRET) {
+      console.error('ANALYSIS_COOKIE_SECRET is not configured')
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
+    }
+
     // Set authentication cookie
     const cookieStore = cookies()
     const isProduction = process.env.NODE_ENV === 'production'
