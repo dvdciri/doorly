@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Navigation from '../../components/Navigation'
 import Footer from '../../components/Footer'
 import { Lock } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [username, setUsername] = useState('')
@@ -52,9 +52,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-navy-gradient px-4 md:px-0">
-      <Navigation />
-      
+    <>
       {/* Login Section */}
       <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-12 md:pb-20">
         <div className="max-w-md mx-auto">
@@ -150,6 +148,43 @@ export default function LoginPage() {
           </div>
         </div>
       </section>
+    </>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <div className="min-h-screen bg-navy-gradient px-4 md:px-0">
+      <Navigation />
+      
+      <Suspense fallback={
+        <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-12 md:pb-20">
+          <div className="max-w-md mx-auto">
+            <div className="text-center mb-8">
+              <div className="flex justify-center mb-6">
+                <div className="flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-accent-red/20 border border-accent-red/30">
+                  <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-accent-red" />
+                </div>
+              </div>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-50 mb-3 sm:mb-4 leading-tight">
+                Market Analysis{' '}
+                <span className="text-accent-red">Portal</span>
+              </h1>
+              <p className="text-base sm:text-lg text-gray-300 leading-relaxed">
+                Sign in to access the internal portal
+              </p>
+              <div className="flex justify-center mt-4 md:mt-6">
+                <div className="h-1 w-16 sm:w-20 bg-accent-red"></div>
+              </div>
+            </div>
+            <div className="bg-navy-900/50 backdrop-blur-sm border border-accent-red/30 rounded-2xl p-6 sm:p-8 md:p-10 shadow-xl">
+              <div className="text-center text-gray-400">Loading...</div>
+            </div>
+          </div>
+        </section>
+      }>
+        <LoginForm />
+      </Suspense>
 
       <Footer />
     </div>
