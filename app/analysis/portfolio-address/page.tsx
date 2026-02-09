@@ -106,11 +106,13 @@ export default function PortfolioAddressAnalysisPage() {
 
     // Process each result
     for (const result of results) {
-      const epcRecords = result.epcRecords || (result.epcRatings?.map(r => ({ 
+      const epcRecords: EPCRecord[] = result.epcRecords || (result.epcRatings?.map(r => ({ 
         address: r.address, 
         rating: r.rating, 
         propertyType: result.propertyType, 
-        totalFloorArea: result.totalFloorArea 
+        totalFloorArea: result.totalFloorArea,
+        lodgementDate: undefined,
+        isExpired: false
       })) || [])
       
       // If no EPC records, add a row with empty EPC fields
