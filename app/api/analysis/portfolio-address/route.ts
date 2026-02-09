@@ -78,7 +78,7 @@ async function getPlaceAutocomplete(input: string, apiKey: string): Promise<{ pl
 
     // Take the first prediction's place_id
     const placeId = data.predictions[0].place_id
-    return { placeId }
+    return { place_id: placeId }
   } catch (error) {
     return {
       error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -500,15 +500,15 @@ export async function POST(request: Request) {
         // Step 1: Get place_id from Autocomplete
         const autocompleteResult = await getPlaceAutocomplete(address, apiKey)
 
-        if (autocompleteResult.error || !autocompleteResult.placeId) {
+        if (autocompleteResult.error || !autocompleteResult.place_id) {
           result.error = autocompleteResult.error || 'Failed to get place_id'
           return result
         }
 
-        result.placeId = autocompleteResult.placeId
+        result.placeId = autocompleteResult.place_id
 
         // Step 2: Get full address details
-        const detailsResult = await getPlaceDetails(autocompleteResult.placeId, apiKey)
+        const detailsResult = await getPlaceDetails(autocompleteResult.place_id, apiKey)
 
         if (detailsResult.error) {
           result.error = detailsResult.error
