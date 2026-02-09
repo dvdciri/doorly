@@ -422,7 +422,14 @@ export default function PortfolioAddressAnalysisPage() {
                     </thead>
                     <tbody className="bg-navy-900/50 divide-y divide-gray-700">
                       {results.map((result, index) => {
-                        const epcRecords = result.epcRecords || (result.epcRatings?.map(r => ({ address: r.address, rating: r.rating, propertyType: result.propertyType, totalFloorArea: result.totalFloorArea })) || [])
+                        const epcRecords: EPCRecord[] = result.epcRecords || (result.epcRatings?.map(r => ({ 
+                          address: r.address, 
+                          rating: r.rating, 
+                          propertyType: result.propertyType, 
+                          totalFloorArea: result.totalFloorArea,
+                          lodgementDate: undefined,
+                          isExpired: false
+                        })) || [])
                         const hasMultipleRecords = epcRecords.length > 1
                         const isExpanded = expandedRows.has(index)
                         const displayRecords = hasMultipleRecords && !isExpanded ? [] : epcRecords
