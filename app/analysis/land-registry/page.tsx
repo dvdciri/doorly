@@ -54,6 +54,7 @@ export default function LandRegistryPage() {
     periodTo: '2026-01',
     propertyTypes: ['all'],
   })
+  const [regionsInput, setRegionsInput] = useState('')
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -86,6 +87,10 @@ export default function LandRegistryPage() {
           periodFrom: config.periodFrom,
           periodTo: config.periodTo,
           propertyTypes: config.propertyTypes,
+          regions: regionsInput
+            .split(/[,;]/)
+            .map((r) => r.trim())
+            .filter(Boolean),
         }),
       })
 
@@ -168,6 +173,24 @@ export default function LandRegistryPage() {
             
             {/* Configuration Form */}
             <div className="mb-6 space-y-6">
+              {/* Regions Search */}
+              <div>
+                <label htmlFor="regions" className="block text-sm font-medium text-gray-300 mb-2">
+                  Regions (comma or semicolon separated)
+                </label>
+                <input
+                  type="text"
+                  id="regions"
+                  value={regionsInput}
+                  onChange={(e) => setRegionsInput(e.target.value)}
+                  placeholder="e.g. Newport, Manchester, Liverpool, Newcastle upon Tyne"
+                  className="w-full px-4 py-2 bg-navy-800 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-red focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Leave empty to use default regions (Newport, Newcastle upon Tyne, Lancaster, Manchester, Liverpool, Stoke-on-Trent)
+                </p>
+              </div>
+
               {/* Date Range */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

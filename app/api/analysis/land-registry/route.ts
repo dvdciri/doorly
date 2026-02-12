@@ -2,14 +2,32 @@ import { NextResponse } from 'next/server'
 
 const SPARQL_ENDPOINT = 'https://landregistry.data.gov.uk/landregistry/sparql'
 
+const DEFAULT_REGIONS = [
+  'Newport',
+  'Newcastle upon Tyne',
+  'Lancaster',
+  'Manchester',
+  'Liverpool',
+  'Stoke-on-Trent',
+]
+
 interface QueryOptions {
   periodFrom?: string // Format: YYYY-MM
   periodTo?: string // Format: YYYY-MM
   propertyTypes?: string[] // ['all', 'detached', 'semi', 'terraced', 'flat']
+  regions?: string[] // Region names to query, e.g. ['Manchester', 'Liverpool']
 }
 
 function buildSparqlQuery(options: QueryOptions): string {
-  const { periodFrom = '2006-01', periodTo = '2026-01', propertyTypes = ['all'] } = options
+  const {
+    periodFrom = '2006-01',
+    periodTo = '2026-01',
+    propertyTypes = ['all'],
+    regions = DEFAULT_REGIONS,
+  } = options
+
+  const regionValues =
+    regions.length > 0 ? regions : DEFAULT_REGIONS
 
   // Build SELECT clause based on selected property types
   const selectFields = [
@@ -133,12 +151,7 @@ SELECT DISTINCT
   ${selectFields.join('\n  ')}
 WHERE {
   VALUES ?wanted {
-    "Newport"
-    "Newcastle upon Tyne"
-    "Lancaster"
-    "Manchester"
-    "Liverpool"
-    "Stoke-on-Trent"
+    ${regionValues.map((r) => `"${r.replace(/"/g, '\\"')}"`).join('\n    ')}
   }
 
   ?region rdfs:label ?regionName .
@@ -174,6 +187,14 @@ export async function POST(request: Request) {
       periodFrom: body.periodFrom,
       periodTo: body.periodTo,
       propertyTypes: body.propertyTypes || ['all'],
+      regions: Array.isArray(body.regions)
+        ? body.regions.filter((r: unknown) => typeof r === 'string' && r.trim())
+        : typeof body.regions === 'string'
+          ? body.regions
+              .split(/[,;]/)
+              .map((r: string) => r.trim())
+              .filter(Boolean)
+          : undefined,
     }
 
     // Validate date format (YYYY-MM)
