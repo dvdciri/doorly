@@ -1,6 +1,9 @@
-import Image from 'next/image'
+import HeroCarousel from './HeroCarousel'
+import { getHeroImages } from '@/lib/heroImages'
 
 export default function Hero() {
+  const heroImages = getHeroImages()
+
   return (
     <section className="w-full py-6 sm:py-8 md:py-12 lg:py-16">
       <div className="container mx-auto px-4 sm:px-6 md:px-6 lg:px-8 max-w-7xl">
@@ -25,16 +28,9 @@ export default function Hero() {
             </p>
           </div>
 
-          {/* Team Image */}
-          <div className="order-1 lg:order-2 relative h-64 sm:h-80 md:h-96 lg:h-[450px] w-full rounded-lg overflow-hidden shadow-2xl">
-            <Image
-              src="/hero.jpg"
-              alt="Doorly Properties team"
-              fill
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-navy-950/60 to-transparent"></div>
+          {/* Hero carousel */}
+          <div className="order-1 lg:order-2">
+            <HeroCarousel images={heroImages} />
           </div>
         </div>
       </div>
