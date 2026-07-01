@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { markWhatsAppRead } from '@/lib/db'
+import { getUnreadInboundMessageIds, markWhatsAppRead } from '@/lib/db'
+import { markMessageAsRead } from '@/lib/whatsapp'
 import { normalizeUKPhone } from '@/lib/phone'
 
 export async function POST(
@@ -11,6 +12,16 @@ export async function POST(
     const phone = normalizeUKPhone(decoded)
     if (!phone) {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
+    }
+
+    const unreadMessageIds = await getUnreadInboundMessageIds(phone)
+
+    for (const messageId of unreadMessageIds) {
+      try {
+        await markMessageAsRead(messageId)
+      } catch (error) {
+        console.error('Failed to mark WhatsApp message as read:', messageId, error)
+      }
     }
 
     await markWhatsAppRead(phone)

@@ -1,4 +1,4 @@
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 
 // Create a connection pool
 const pool = new Pool({
@@ -8,11 +8,26 @@ const pool = new Pool({
   },
 })
 
+async function ensureUtcSession(client: PoolClient): Promise<void> {
+  await client.query("SET TIME ZONE 'UTC'")
+}
+
+const originalConnect = pool.connect.bind(pool)
+pool.connect = (async (...args: Parameters<typeof pool.connect>) => {
+  const client = await originalConnect(...args)
+  await ensureUtcSession(client)
+  return client
+}) as typeof pool.connect
+
 // Handle pool errors
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err)
   process.exit(-1)
 })
+
+function toUnixSeconds(value: Date | number): number {
+  return typeof value === 'number' ? value : Math.floor(value.getTime() / 1000)
+}
 
 // Query helper function
 export async function query(text: string, params?: any[]) {
@@ -222,6 +237,8 @@ export async function initializePortfolioDatabase() {
   }
 }
 
+export type WhatsAppMessageType = 'text' | 'image' | 'video' | 'audio'
+
 export interface WhatsAppMessageRow {
   id: number
   wa_message_id: string | null
@@ -230,8 +247,24 @@ export interface WhatsAppMessageRow {
   body: string
   wa_timestamp: Date
   notion_page_id: string | null
+  status: string | null
+  status_at: Date | null
   created_at: Date
+  message_type: WhatsAppMessageType
+  media_mime_type: string | null
+  wa_media_id: string | null
+  media_blob_pathname: string | null
 }
+
+export interface WhatsAppContactRow {
+  phone: string
+  wa_profile_name: string | null
+  updated_at: Date
+}
+
+export type WhatsAppMessageStatus = 'sent' | 'delivered' | 'read' | 'failed'
+
+const MESSAGE_SELECT = `id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, status, status_at, created_at, message_type, media_mime_type, wa_media_id, media_blob_pathname`
 
 let leadsDbInitPromise: Promise<void> | null = null
 
@@ -249,17 +282,115 @@ export async function initializeLeadsDatabase() {
           phone TEXT NOT NULL,
           direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
           body TEXT NOT NULL,
-          wa_timestamp TIMESTAMP NOT NULL,
+          wa_timestamp TIMESTAMPTZ NOT NULL,
           notion_page_id TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
       `)
 
       await query(`
         CREATE TABLE IF NOT EXISTS whatsapp_read_state (
           phone TEXT PRIMARY KEY,
-          last_read_at TIMESTAMP NOT NULL
+          last_read_at TIMESTAMPTZ NOT NULL
         );
+      `)
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS whatsapp_contact (
+          phone TEXT PRIMARY KEY,
+          wa_profile_name TEXT,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+      `)
+
+      await query(`
+        ALTER TABLE whatsapp_message ADD COLUMN IF NOT EXISTS status TEXT;
+      `)
+      await query(`
+        ALTER TABLE whatsapp_message ADD COLUMN IF NOT EXISTS status_at TIMESTAMPTZ;
+      `)
+      await query(`
+        ALTER TABLE whatsapp_message ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'text';
+      `)
+      await query(`
+        ALTER TABLE whatsapp_message ADD COLUMN IF NOT EXISTS media_mime_type TEXT;
+      `)
+      await query(`
+        ALTER TABLE whatsapp_message ADD COLUMN IF NOT EXISTS wa_media_id TEXT;
+      `)
+      await query(`
+        ALTER TABLE whatsapp_message ADD COLUMN IF NOT EXISTS media_blob_pathname TEXT;
+      `)
+
+      await query(`
+        DO $$ BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'whatsapp_message'
+              AND column_name = 'wa_timestamp'
+              AND udt_name = 'timestamp'
+          ) THEN
+            ALTER TABLE whatsapp_message
+              ALTER COLUMN wa_timestamp TYPE TIMESTAMPTZ USING wa_timestamp AT TIME ZONE 'UTC';
+          END IF;
+        END $$;
+      `)
+      await query(`
+        DO $$ BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'whatsapp_message'
+              AND column_name = 'status_at'
+              AND udt_name = 'timestamp'
+          ) THEN
+            ALTER TABLE whatsapp_message
+              ALTER COLUMN status_at TYPE TIMESTAMPTZ USING status_at AT TIME ZONE 'UTC';
+          END IF;
+        END $$;
+      `)
+      await query(`
+        DO $$ BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'whatsapp_message'
+              AND column_name = 'created_at'
+              AND udt_name = 'timestamp'
+          ) THEN
+            ALTER TABLE whatsapp_message
+              ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+          END IF;
+        END $$;
+      `)
+      await query(`
+        DO $$ BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'whatsapp_read_state'
+              AND column_name = 'last_read_at'
+              AND udt_name = 'timestamp'
+          ) THEN
+            ALTER TABLE whatsapp_read_state
+              ALTER COLUMN last_read_at TYPE TIMESTAMPTZ USING last_read_at AT TIME ZONE 'UTC';
+          END IF;
+        END $$;
+      `)
+      await query(`
+        DO $$ BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'whatsapp_contact'
+              AND column_name = 'updated_at'
+              AND udt_name = 'timestamp'
+          ) THEN
+            ALTER TABLE whatsapp_contact
+              ALTER COLUMN updated_at TYPE TIMESTAMPTZ USING updated_at AT TIME ZONE 'UTC';
+          END IF;
+        END $$;
       `)
     } catch (error: any) {
       leadsDbInitPromise = null
@@ -276,23 +407,51 @@ export async function insertWhatsAppMessage(params: {
   phone: string
   direction: 'inbound' | 'outbound'
   body: string
-  waTimestamp: Date
+  waTimestamp?: Date | number
   notionPageId?: string | null
+  status?: WhatsAppMessageStatus | null
+  statusAt?: Date | number | null
+  messageType?: WhatsAppMessageType
+  mediaMimeType?: string | null
+  waMediaId?: string | null
+  mediaBlobPathname?: string | null
 }): Promise<WhatsAppMessageRow> {
   await initializeLeadsDatabase()
 
+  const waTimestampSeconds =
+    params.waTimestamp === undefined ? null : toUnixSeconds(params.waTimestamp)
+  const statusAtSeconds =
+    params.statusAt === undefined || params.statusAt === null
+      ? null
+      : toUnixSeconds(params.statusAt)
+
   const result = await query(
-    `INSERT INTO whatsapp_message (wa_message_id, phone, direction, body, wa_timestamp, notion_page_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO whatsapp_message (
+       wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, status, status_at,
+       message_type, media_mime_type, wa_media_id, media_blob_pathname
+     )
+     VALUES (
+       $1, $2, $3, $4,
+       COALESCE(to_timestamp($5::double precision), NOW()),
+       $6, $7,
+       CASE WHEN $8::double precision IS NULL THEN NULL ELSE to_timestamp($8::double precision) END,
+       $9, $10, $11, $12
+     )
      ON CONFLICT (wa_message_id) DO NOTHING
-     RETURNING id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, created_at`,
+     RETURNING ${MESSAGE_SELECT}`,
     [
       params.waMessageId || null,
       params.phone,
       params.direction,
       params.body,
-      params.waTimestamp,
+      waTimestampSeconds,
       params.notionPageId || null,
+      params.status || null,
+      statusAtSeconds,
+      params.messageType || 'text',
+      params.mediaMimeType || null,
+      params.waMediaId || null,
+      params.mediaBlobPathname || null,
     ]
   )
 
@@ -302,8 +461,7 @@ export async function insertWhatsAppMessage(params: {
 
   if (params.waMessageId) {
     const existing = await query(
-      `SELECT id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, created_at
-       FROM whatsapp_message WHERE wa_message_id = $1`,
+      `SELECT ${MESSAGE_SELECT} FROM whatsapp_message WHERE wa_message_id = $1`,
       [params.waMessageId]
     )
     return existing.rows[0]
@@ -312,16 +470,144 @@ export async function insertWhatsAppMessage(params: {
   throw new Error('Failed to insert WhatsApp message')
 }
 
+export async function upsertWhatsAppContact(
+  phone: string,
+  waProfileName: string | null
+): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(
+    `INSERT INTO whatsapp_contact (phone, wa_profile_name, updated_at)
+     VALUES ($1, $2, CURRENT_TIMESTAMP)
+     ON CONFLICT (phone) DO UPDATE SET
+       wa_profile_name = COALESCE(EXCLUDED.wa_profile_name, whatsapp_contact.wa_profile_name),
+       updated_at = CURRENT_TIMESTAMP`,
+    [phone, waProfileName]
+  )
+}
+
+export async function getWhatsAppContact(phone: string): Promise<WhatsAppContactRow | null> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT phone, wa_profile_name, updated_at FROM whatsapp_contact WHERE phone = $1`,
+    [phone]
+  )
+  return result.rows[0] || null
+}
+
+const STATUS_RANK: Record<string, number> = {
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 0,
+}
+
+export async function updateWhatsAppMessageStatus(
+  waMessageId: string,
+  status: string,
+  statusAt: Date | number
+): Promise<void> {
+  await initializeLeadsDatabase()
+
+  const statusAtSeconds = toUnixSeconds(statusAt)
+
+  const existing = await query(
+    `SELECT status FROM whatsapp_message WHERE wa_message_id = $1`,
+    [waMessageId]
+  )
+
+  if (existing.rows.length === 0) {
+    return
+  }
+
+  const currentStatus = existing.rows[0].status as string | null
+  const currentRank = currentStatus ? (STATUS_RANK[currentStatus] ?? 0) : 0
+  const newRank = STATUS_RANK[status] ?? 0
+
+  if (status !== 'failed' && currentRank > newRank) {
+    return
+  }
+
+  if (status === 'sent') {
+    await query(
+      `UPDATE whatsapp_message
+       SET status = $1,
+           status_at = to_timestamp($2::double precision),
+           wa_timestamp = to_timestamp($2::double precision)
+       WHERE wa_message_id = $3`,
+      [status, statusAtSeconds, waMessageId]
+    )
+  } else {
+    await query(
+      `UPDATE whatsapp_message
+       SET status = $1, status_at = to_timestamp($2::double precision)
+       WHERE wa_message_id = $3`,
+      [status, statusAtSeconds, waMessageId]
+    )
+  }
+}
+
+export async function getUnreadInboundMessageIds(phone: string): Promise<string[]> {
+  await initializeLeadsDatabase()
+  const readState = await query(
+    `SELECT last_read_at FROM whatsapp_read_state WHERE phone = $1`,
+    [phone]
+  )
+  const lastReadAt = readState.rows[0]?.last_read_at
+
+  const result = lastReadAt
+    ? await query(
+        `SELECT wa_message_id FROM whatsapp_message
+         WHERE phone = $1 AND direction = 'inbound' AND wa_timestamp > $2
+           AND wa_message_id IS NOT NULL
+         ORDER BY wa_timestamp ASC`,
+        [phone, lastReadAt]
+      )
+    : await query(
+        `SELECT wa_message_id FROM whatsapp_message
+         WHERE phone = $1 AND direction = 'inbound' AND wa_message_id IS NOT NULL
+         ORDER BY wa_timestamp ASC`,
+        [phone]
+      )
+
+  return result.rows.map((row) => row.wa_message_id).filter(Boolean)
+}
+
 export async function getWhatsAppMessages(phone: string): Promise<WhatsAppMessageRow[]> {
   await initializeLeadsDatabase()
   const result = await query(
-    `SELECT id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, created_at
+    `SELECT ${MESSAGE_SELECT}
      FROM whatsapp_message
      WHERE phone = $1
-     ORDER BY wa_timestamp ASC`,
+     ORDER BY wa_timestamp ASC, id ASC`,
     [phone]
   )
   return result.rows
+}
+
+export async function getWhatsAppMessageById(
+  messageId: number
+): Promise<WhatsAppMessageRow | null> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT ${MESSAGE_SELECT} FROM whatsapp_message WHERE id = $1`,
+    [messageId]
+  )
+  return result.rows[0] || null
+}
+
+export async function updateWhatsAppMessageMedia(
+  messageId: number,
+  mediaBlobPathname: string,
+  mediaMimeType?: string | null
+): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(
+    `UPDATE whatsapp_message
+     SET media_blob_pathname = $1,
+         media_mime_type = COALESCE($2, media_mime_type)
+     WHERE id = $3`,
+    [mediaBlobPathname, mediaMimeType || null, messageId]
+  )
 }
 
 export async function markWhatsAppRead(phone: string): Promise<void> {

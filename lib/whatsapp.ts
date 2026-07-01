@@ -87,3 +87,65 @@ export function verifyWebhookToken(token: string | null): boolean {
   const expected = process.env.WHATSAPP_VERIFY_TOKEN
   return Boolean(expected && token === expected)
 }
+
+export async function markMessageAsRead(waMessageId: string): Promise<void> {
+  const phoneNumberId = getPhoneNumberId()
+  const response = await fetch(`${WHATSAPP_API_BASE}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: waMessageId,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`WhatsApp mark read error: ${response.status} - ${errorText}`)
+  }
+}
+
+export async function downloadWhatsAppMedia(mediaId: string): Promise<{
+  buffer: Buffer
+  mimeType: string
+}> {
+  const metaResponse = await fetch(`${WHATSAPP_API_BASE}/${mediaId}`, {
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+    },
+  })
+
+  if (!metaResponse.ok) {
+    const errorText = await metaResponse.text()
+    throw new Error(`WhatsApp media metadata error: ${metaResponse.status} - ${errorText}`)
+  }
+
+  const meta = await metaResponse.json()
+  const mediaUrl = meta.url as string | undefined
+  const mimeType = (meta.mime_type as string | undefined) || 'application/octet-stream'
+
+  if (!mediaUrl) {
+    throw new Error('WhatsApp media metadata did not include a URL')
+  }
+
+  const fileResponse = await fetch(mediaUrl, {
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+    },
+  })
+
+  if (!fileResponse.ok) {
+    const errorText = await fileResponse.text()
+    throw new Error(`WhatsApp media download error: ${fileResponse.status} - ${errorText}`)
+  }
+
+  const arrayBuffer = await fileResponse.arrayBuffer()
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    mimeType,
+  }
+}

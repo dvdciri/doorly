@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import {
+  getWhatsAppContact,
   getWhatsAppMessages,
   insertWhatsAppMessage,
-  markWhatsAppRead,
 } from '@/lib/db'
 import { sendTextMessage } from '@/lib/whatsapp'
 import { normalizeUKPhone } from '@/lib/phone'
+
+export const dynamic = 'force-dynamic'
 
 function decodePhoneParam(encoded: string): string | null {
   try {
@@ -26,16 +28,30 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
     }
 
-    const messages = await getWhatsAppMessages(phone)
+    const [messages, contact] = await Promise.all([
+      getWhatsAppMessages(phone),
+      getWhatsAppContact(phone),
+    ])
 
     return NextResponse.json({
       phone,
+      contact: {
+        phone,
+        waProfileName: contact?.wa_profile_name || null,
+      },
       messages: messages.map((message) => ({
         id: message.id,
         waMessageId: message.wa_message_id,
         direction: message.direction,
         body: message.body,
-        timestamp: message.wa_timestamp,
+        timestamp: new Date(message.wa_timestamp).toISOString(),
+        status: message.status,
+        statusAt: message.status_at
+          ? new Date(message.status_at).toISOString()
+          : null,
+        messageType: message.message_type || 'text',
+        mediaMimeType: message.media_mime_type,
+        hasMedia: Boolean(message.media_blob_pathname || message.wa_media_id),
       })),
     })
   } catch (error: any) {
@@ -74,8 +90,8 @@ export async function POST(
       phone,
       direction: 'outbound',
       body: message.trim(),
-      waTimestamp: new Date(),
       notionPageId: notionPageId || null,
+      status: 'sent',
     })
 
     return NextResponse.json({ success: true, messageId })

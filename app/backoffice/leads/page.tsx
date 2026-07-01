@@ -13,8 +13,12 @@ import {
   X,
   Send,
   ExternalLink,
+  Check,
+  CheckCheck,
+  AlertCircle,
 } from 'lucide-react'
-import { validateUKPhone } from '@/lib/phone'
+import { validateUKPhone, formatUKPhone } from '@/lib/phone'
+import { formatUKDateTime, getInitials } from '@/lib/datetime'
 
 interface Lead {
   id: string
@@ -46,23 +50,120 @@ interface ChatMessage {
   direction: 'inbound' | 'outbound'
   body: string
   timestamp: string
+  status?: string | null
+  statusAt?: string | null
+  messageType?: 'text' | 'image' | 'video' | 'audio'
+  mediaMimeType?: string | null
+  hasMedia?: boolean
 }
 
-interface UnreadItem {
+interface ChatContact {
   phone: string
-  unreadCount: number
-  lastMessageAt: string
-  lastMessageBody: string
-  lead: { id: string; name: string; stage: string | null } | null
-}
-
-function truncate(text: string, max = 80): string {
-  if (text.length <= max) return text
-  return `${text.slice(0, max)}…`
+  waProfileName: string | null
 }
 
 function encodePhoneForUrl(phone: string): string {
   return encodeURIComponent(phone)
+}
+
+function sortChatMessages(messages: ChatMessage[]): ChatMessage[] {
+  return [...messages].sort((a, b) => {
+    const timeDiff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    if (timeDiff !== 0) return timeDiff
+    return a.id - b.id
+  })
+}
+
+function isNearChatBottom(el: HTMLElement, threshold = 80): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold
+}
+
+function isMediaPlaceholder(body: string): boolean {
+  return /^\[(Image|Video|Audio)\]$/.test(body)
+}
+
+function ChatMessageContent({ msg }: { msg: ChatMessage }) {
+  const messageType = msg.messageType || 'text'
+  const mediaUrl = `/api/backoffice/chat/media/${msg.id}`
+  const showCaption =
+    messageType !== 'text' && msg.body && !isMediaPlaceholder(msg.body)
+
+  if (messageType === 'image' && msg.hasMedia) {
+    return (
+      <>
+        <img
+          src={mediaUrl}
+          alt=""
+          className="max-w-full rounded-lg"
+          loading="lazy"
+        />
+        {showCaption && <p className="mt-2 whitespace-pre-wrap">{msg.body}</p>}
+      </>
+    )
+  }
+
+  if (messageType === 'video' && msg.hasMedia) {
+    return (
+      <>
+        <video
+          src={mediaUrl}
+          controls
+          className="max-w-full rounded-lg"
+          preload="metadata"
+        />
+        {showCaption && <p className="mt-2 whitespace-pre-wrap">{msg.body}</p>}
+      </>
+    )
+  }
+
+  if (messageType === 'audio' && msg.hasMedia) {
+    return (
+      <>
+        <audio src={mediaUrl} controls className="w-full min-w-[220px]" preload="metadata" />
+        {showCaption && <p className="mt-2 whitespace-pre-wrap">{msg.body}</p>}
+      </>
+    )
+  }
+
+  if (messageType !== 'text' && msg.hasMedia) {
+    return <p className="whitespace-pre-wrap">{msg.body || `[${messageType}]`}</p>
+  }
+
+  return <p className="whitespace-pre-wrap">{msg.body}</p>
+}
+
+function MessageStatusReceipt({ status }: { status?: string | null }) {
+  if (!status) return null
+
+  if (status === 'read') {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-sky-300" title="Read">
+        <CheckCheck className="w-3.5 h-3.5" />
+      </span>
+    )
+  }
+  if (status === 'delivered') {
+    return (
+      <span className="inline-flex items-center gap-0.5 opacity-70" title="Delivered">
+        <CheckCheck className="w-3.5 h-3.5" />
+      </span>
+    )
+  }
+  if (status === 'sent') {
+    return (
+      <span className="inline-flex items-center gap-0.5 opacity-70" title="Sent">
+        <Check className="w-3.5 h-3.5" />
+      </span>
+    )
+  }
+  if (status === 'failed') {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-red-300" title="Failed to send">
+        <AlertCircle className="w-3.5 h-3.5" />
+      </span>
+    )
+  }
+  return null
 }
 
 export default function LeadsPipelinePage() {
@@ -71,7 +172,6 @@ export default function LeadsPipelinePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [columns, setColumns] = useState<PipelineColumn[]>([])
-  const [unread, setUnread] = useState<UnreadItem[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
@@ -81,20 +181,19 @@ export default function LeadsPipelinePage() {
   const [newComment, setNewComment] = useState('')
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatContact, setChatContact] = useState<ChatContact | null>(null)
   const [chatLoading, setChatLoading] = useState(false)
   const [newMessage, setNewMessage] = useState('')
   const [messageSending, setMessageSending] = useState(false)
-  const chatEndRef = useRef<HTMLDivElement>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+  const scrollSmoothOnNextRef = useRef(false)
+  const isAtBottomRef = useRef(true)
 
   const canChat = selectedLead?.phone ? validateUKPhone(selectedLead.phone) : false
 
   const fetchPipeline = useCallback(async () => {
     try {
-      const [leadsRes, unreadRes] = await Promise.all([
-        fetch('/api/backoffice/leads'),
-        fetch('/api/backoffice/leads/unread'),
-      ])
+      const leadsRes = await fetch('/api/backoffice/leads')
 
       if (!leadsRes.ok) {
         const data = await leadsRes.json()
@@ -103,11 +202,6 @@ export default function LeadsPipelinePage() {
 
       const leadsData = await leadsRes.json()
       setColumns(leadsData.columns || [])
-
-      if (unreadRes.ok) {
-        const unreadData = await unreadRes.json()
-        setUnread(unreadData.unread || [])
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load pipeline')
     } finally {
@@ -137,8 +231,13 @@ export default function LeadsPipelinePage() {
     }
   }, [])
 
-  const fetchChat = useCallback(async (phone: string, markRead = false) => {
-    setChatLoading(true)
+  const fetchChat = useCallback(async (
+    phone: string,
+    options?: { silent?: boolean; refreshPipeline?: boolean }
+  ) => {
+    if (!options?.silent) {
+      setChatLoading(true)
+    }
     try {
       const response = await fetch(`/api/backoffice/chat/${encodePhoneForUrl(phone)}`)
       if (!response.ok) {
@@ -146,23 +245,22 @@ export default function LeadsPipelinePage() {
         throw new Error(data.error || 'Failed to load chat')
       }
       const data = await response.json()
-      setChatMessages(data.messages || [])
+      setChatContact(data.contact || null)
+      setChatMessages(sortChatMessages(data.messages || []))
 
-      if (markRead) {
-        await fetch(`/api/backoffice/chat/${encodePhoneForUrl(phone)}/read`, {
-          method: 'POST',
-        })
+      await fetch(`/api/backoffice/chat/${encodePhoneForUrl(phone)}/read`, {
+        method: 'POST',
+      })
+      if (options?.refreshPipeline !== false) {
         fetchPipeline()
       }
     } catch (err) {
       console.error(err)
     } finally {
-      setChatLoading(false)
+      if (!options?.silent) {
+        setChatLoading(false)
+      }
     }
-  }, [fetchPipeline])
-
-  useEffect(() => {
-    fetchPipeline()
   }, [fetchPipeline])
 
   useEffect(() => {
@@ -170,37 +268,83 @@ export default function LeadsPipelinePage() {
       setSelectedLead(null)
       setComments([])
       setChatMessages([])
+      setChatContact(null)
       return
     }
     fetchLeadDetail(selectedLeadId)
   }, [selectedLeadId, fetchLeadDetail])
 
   useEffect(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current)
-      pollRef.current = null
+    const phone = selectedLead?.phone
+    const chatOpen = Boolean(phone && canChat)
+    const pollIntervalMs = chatOpen ? 3000 : 5000
+
+    const tick = async () => {
+      await fetchPipeline()
+      if (chatOpen && phone) {
+        await fetchChat(phone, { silent: true, refreshPipeline: false })
+      }
     }
 
-    if (!selectedLead?.phone || !canChat) {
+    tick()
+    const id = setInterval(tick, pollIntervalMs)
+    return () => clearInterval(id)
+  }, [selectedLead?.phone, canChat, fetchPipeline, fetchChat])
+
+  const scrollChatToBottom = useCallback((smooth = false) => {
+    const el = chatScrollRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+    isAtBottomRef.current = true
+  }, [])
+
+  const handleChatScroll = useCallback(() => {
+    const el = chatScrollRef.current
+    if (!el) return
+    isAtBottomRef.current = isNearChatBottom(el)
+  }, [])
+
+  useEffect(() => {
+    isAtBottomRef.current = true
+  }, [selectedLead?.phone])
+
+  useEffect(() => {
+    const smooth = scrollSmoothOnNextRef.current
+    const forceScroll = scrollSmoothOnNextRef.current
+    scrollSmoothOnNextRef.current = false
+
+    if (!forceScroll && !isAtBottomRef.current) {
       return
     }
 
-    fetchChat(selectedLead.phone, true)
+    requestAnimationFrame(() => {
+      scrollChatToBottom(smooth)
+    })
+  }, [chatMessages, scrollChatToBottom])
 
-    pollRef.current = setInterval(() => {
-      fetchChat(selectedLead.phone!, false)
-    }, 5000)
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current)
-      }
-    }
-  }, [selectedLead?.phone, canChat, fetchChat])
+  const closeLead = useCallback(() => {
+    setSelectedLeadId(null)
+    setSelectedLead(null)
+    setDetailError(null)
+    setChatContact(null)
+    setChatMessages([])
+  }, [])
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [chatMessages])
+    if (!selectedLeadId) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLead()
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = 'unset'
+    }
+  }, [selectedLeadId, closeLead])
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -220,12 +364,6 @@ export default function LeadsPipelinePage() {
     setSelectedLead(lead)
     setDetailError(null)
     setSelectedLeadId(lead.id)
-  }
-
-  const closeLead = () => {
-    setSelectedLeadId(null)
-    setSelectedLead(null)
-    setDetailError(null)
   }
 
   const handleAddComment = async (e: React.FormEvent) => {
@@ -274,27 +412,12 @@ export default function LeadsPipelinePage() {
         throw new Error(data.error || 'Failed to send message')
       }
       setNewMessage('')
-      await fetchChat(selectedLead.phone, false)
+      scrollSmoothOnNextRef.current = true
+      await fetchChat(selectedLead.phone)
     } catch (err) {
       console.error(err)
     } finally {
       setMessageSending(false)
-    }
-  }
-
-  const jumpToUnread = (item: UnreadItem) => {
-    if (item.lead) {
-      openLead({
-        id: item.lead.id,
-        name: item.lead.name,
-        stage: item.lead.stage,
-        phone: item.phone,
-        leadSource: null,
-        addedDate: null,
-        propertyCount: null,
-        extraInformation: null,
-        url: '',
-      })
     }
   }
 
@@ -342,45 +465,7 @@ export default function LeadsPipelinePage() {
           )}
 
           {!loading && !error && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Unread inbox */}
-              <div className="lg:col-span-1">
-                <div className="bg-navy-900/50 border border-accent-red/30 rounded-2xl p-4 sticky top-4">
-                  <h2 className="text-lg font-bold text-gray-50 mb-4 flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5 text-accent-red" />
-                    Unread Messages
-                  </h2>
-                  {unread.length === 0 ? (
-                    <p className="text-gray-400 text-sm">No unread messages</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {unread.map((item) => (
-                        <li key={item.phone}>
-                          <button
-                            onClick={() => jumpToUnread(item)}
-                            className="w-full text-left p-3 rounded-xl bg-navy-800/50 hover:bg-navy-800 border border-navy-700 hover:border-accent-red/40 transition-colors"
-                          >
-                            <div className="flex justify-between items-start gap-2">
-                              <span className="font-medium text-gray-50 text-sm">
-                                {item.lead?.name || item.phone}
-                              </span>
-                              <span className="bg-accent-red text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                                {item.unreadCount}
-                              </span>
-                            </div>
-                            <p className="text-gray-400 text-xs mt-1 line-clamp-2">
-                              {item.lastMessageBody}
-                            </p>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* Pipeline board */}
-              <div className="lg:col-span-3 overflow-x-auto">
+            <div className="overflow-x-auto">
                 <div className="flex gap-4 min-w-max pb-4">
                   {columns.map((column) => (
                     <div
@@ -393,7 +478,7 @@ export default function LeadsPipelinePage() {
                           {column.leads.length}
                         </span>
                       </h3>
-                      <div className="space-y-2 max-h-[70vh] overflow-y-auto">
+                      <div className="space-y-2 max-h-[70vh] overflow-y-auto scrollbar-subtle">
                         {column.leads.map((lead) => (
                           <button
                             key={lead.id}
@@ -423,11 +508,6 @@ export default function LeadsPipelinePage() {
                                 Properties: {lead.propertyCount}
                               </p>
                             )}
-                            {lead.extraInformation && (
-                              <p className="text-xs text-gray-400 mt-1 italic">
-                                {truncate(lead.extraInformation)}
-                              </p>
-                            )}
                             {lead.phone && validateUKPhone(lead.phone) && (
                               <p className="text-xs text-accent-red/80 mt-1 flex items-center gap-1">
                                 <MessageCircle className="w-3 h-3" />
@@ -443,7 +523,6 @@ export default function LeadsPipelinePage() {
                     </div>
                   ))}
                 </div>
-              </div>
             </div>
           )}
         </div>
@@ -475,9 +554,9 @@ export default function LeadsPipelinePage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
               {detailLoading && !selectedLead && (
-                <div className="flex justify-center py-20">
+                <div className="flex flex-1 min-h-0 items-center justify-center">
                   <Loader2 className="w-8 h-8 text-accent-red animate-spin" />
                 </div>
               )}
@@ -489,10 +568,12 @@ export default function LeadsPipelinePage() {
               )}
 
               {selectedLead && (
-                <div className={`p-6 sm:p-8 ${detailLoading ? 'opacity-60' : ''}`}>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+                <div
+                  className={`flex-1 min-h-0 flex flex-col p-6 sm:p-8 ${detailLoading ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-2 gap-8 lg:gap-12">
                     {/* Left column: lead info + comments */}
-                    <div className="space-y-6">
+                    <div className="space-y-6 overflow-y-auto overscroll-contain scrollbar-subtle min-h-0 max-h-[38vh] shrink-0 lg:shrink lg:max-h-none pr-1">
                       <div className="space-y-3">
                         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
                           Lead information
@@ -553,7 +634,7 @@ export default function LeadsPipelinePage() {
                           comments.length === 0 ? (
                             <p className="text-gray-500 text-sm">No comments yet</p>
                           ) : (
-                            <ul className="space-y-2 max-h-64 overflow-y-auto">
+                            <ul className="space-y-2">
                               {comments.map((comment) => (
                                 <li
                                   key={comment.id}
@@ -588,15 +669,36 @@ export default function LeadsPipelinePage() {
                     </div>
 
                     {/* Right column: WhatsApp chat */}
-                    <div className="space-y-3 flex flex-col min-h-[480px] lg:min-h-0 lg:h-full">
-                      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                        <MessageCircle className="w-4 h-4" />
-                        WhatsApp Chat
-                      </h3>
-
+                    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                       {canChat && selectedLead.phone ? (
                         <>
-                          <div className="flex-1 bg-navy-800/30 border border-navy-700 rounded-xl p-4 min-h-[360px] lg:min-h-[580px] overflow-y-auto">
+                          <div className="flex-shrink-0 flex items-center gap-3 pb-3 border-b border-navy-700">
+                            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-accent-red/20 border border-accent-red/40 flex items-center justify-center text-accent-red font-semibold">
+                              {getInitials(
+                                chatContact?.waProfileName || selectedLead.name
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-gray-50 truncate">
+                                {selectedLead.name}
+                              </p>
+                              {chatContact?.waProfileName &&
+                                chatContact.waProfileName !== selectedLead.name && (
+                                  <p className="text-sm text-gray-400 truncate">
+                                    WhatsApp: {chatContact.waProfileName}
+                                  </p>
+                                )}
+                              <p className="text-sm text-gray-500">
+                                {formatUKPhone(selectedLead.phone)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div
+                            ref={chatScrollRef}
+                            onScroll={handleChatScroll}
+                            className="flex-1 min-h-0 bg-navy-800/30 border border-navy-700 rounded-xl p-4 overflow-y-auto overscroll-contain scrollbar-subtle"
+                          >
                             {chatLoading && chatMessages.length === 0 ? (
                               <div className="flex justify-center py-12">
                                 <Loader2 className="w-6 h-6 text-accent-red animate-spin" />
@@ -619,18 +721,22 @@ export default function LeadsPipelinePage() {
                                           : 'bg-navy-700 text-gray-100'
                                       }`}
                                     >
-                                      <p>{msg.body}</p>
-                                      <p className="text-xs opacity-70 mt-1">
-                                        {new Date(msg.timestamp).toLocaleString()}
-                                      </p>
+                                      <ChatMessageContent msg={msg} />
+                                      <div className="flex items-center justify-end gap-1.5 mt-1">
+                                        <span className="text-xs opacity-70">
+                                          {formatUKDateTime(msg.timestamp)}
+                                        </span>
+                                        {msg.direction === 'outbound' && (
+                                          <MessageStatusReceipt status={msg.status} />
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 ))}
-                                <div ref={chatEndRef} />
                               </div>
                             )}
                           </div>
-                          <form onSubmit={handleSendMessage} className="flex gap-2">
+                          <form onSubmit={handleSendMessage} className="flex-shrink-0 flex gap-2 mt-3">
                             <input
                               type="text"
                               value={newMessage}

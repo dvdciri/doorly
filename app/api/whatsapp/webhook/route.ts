@@ -1,6 +1,68 @@
 import { NextResponse } from 'next/server'
-import { insertWhatsAppMessage } from '@/lib/db'
+import {
+  insertWhatsAppMessage,
+  updateWhatsAppMessageStatus,
+  upsertWhatsAppContact,
+} from '@/lib/db'
+import type { WhatsAppMessageType } from '@/lib/db'
 import { fromWhatsAppPhone, verifyWebhookToken } from '@/lib/whatsapp'
+import { cacheWhatsAppMediaToBlob, mediaBodyLabel } from '@/lib/whatsapp-media'
+
+function buildContactNameMap(contacts: any[]): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const contact of contacts) {
+    const name = contact.profile?.name
+    if (contact.wa_id && name) {
+      map.set(contact.wa_id, name)
+    }
+  }
+  return map
+}
+
+type InboundMessagePayload = {
+  messageType: WhatsAppMessageType
+  body: string
+  mediaId?: string
+  mediaMimeType?: string | null
+}
+
+function parseInboundMessage(message: any): InboundMessagePayload | null {
+  if (message.type === 'text' && message.text?.body) {
+    return {
+      messageType: 'text',
+      body: message.text.body,
+    }
+  }
+
+  if (message.type === 'image' && message.image?.id) {
+    return {
+      messageType: 'image',
+      body: mediaBodyLabel('image', message.image.caption),
+      mediaId: message.image.id,
+      mediaMimeType: message.image.mime_type || null,
+    }
+  }
+
+  if (message.type === 'video' && message.video?.id) {
+    return {
+      messageType: 'video',
+      body: mediaBodyLabel('video', message.video.caption),
+      mediaId: message.video.id,
+      mediaMimeType: message.video.mime_type || null,
+    }
+  }
+
+  if (message.type === 'audio' && message.audio?.id) {
+    return {
+      messageType: 'audio',
+      body: mediaBodyLabel('audio'),
+      mediaId: message.audio.id,
+      mediaMimeType: message.audio.mime_type || null,
+    }
+  }
+
+  return null
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -22,12 +84,15 @@ export async function POST(request: Request) {
     for (const entry of body.entry || []) {
       for (const change of entry.changes || []) {
         const value = change.value
-        if (!value?.messages) {
+        if (!value) {
           continue
         }
 
-        for (const message of value.messages) {
-          if (message.type !== 'text' || !message.text?.body) {
+        const contactNames = buildContactNameMap(value.contacts || [])
+
+        for (const message of value.messages || []) {
+          const parsed = parseInboundMessage(message)
+          if (!parsed) {
             continue
           }
 
@@ -37,15 +102,47 @@ export async function POST(request: Request) {
             continue
           }
 
-          const timestamp = new Date(Number(message.timestamp) * 1000)
+          const profileName = contactNames.get(message.from) || null
+          if (profileName) {
+            await upsertWhatsAppContact(phone, profileName)
+          }
+
+          let mediaBlobPathname: string | null = null
+          let mediaMimeType = parsed.mediaMimeType || null
+
+          if (parsed.mediaId && message.id) {
+            const cached = await cacheWhatsAppMediaToBlob(
+              phone,
+              message.id,
+              parsed.mediaId,
+              parsed.mediaMimeType
+            )
+            if (cached) {
+              mediaBlobPathname = cached.pathname
+              mediaMimeType = cached.mimeType
+            }
+          }
 
           await insertWhatsAppMessage({
             waMessageId: message.id,
             phone,
             direction: 'inbound',
-            body: message.text.body,
-            waTimestamp: timestamp,
+            body: parsed.body,
+            waTimestamp: Number(message.timestamp),
+            messageType: parsed.messageType,
+            mediaMimeType,
+            waMediaId: parsed.mediaId || null,
+            mediaBlobPathname,
           })
+        }
+
+        for (const status of value.statuses || []) {
+          if (!status.id || !status.status) {
+            continue
+          }
+
+          const statusAt = Number(status.timestamp)
+          await updateWhatsAppMessageStatus(status.id, status.status, statusAt)
         }
       }
     }
