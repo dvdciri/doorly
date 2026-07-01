@@ -13,6 +13,16 @@ const nextConfig = {
         destination: '/backoffice/:path*',
         permanent: true,
       },
+      {
+        source: '/mufb-portfolio/terms',
+        destination: '/terms',
+        permanent: true,
+      },
+      {
+        source: '/mufb-portfolio/privacy',
+        destination: '/privacy',
+        permanent: true,
+      },
     ]
   },
 }

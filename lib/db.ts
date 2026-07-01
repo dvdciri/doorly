@@ -392,6 +392,25 @@ export async function initializeLeadsDatabase() {
           END IF;
         END $$;
       `)
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS welcome_message_job (
+          id SERIAL PRIMARY KEY,
+          notion_page_id TEXT NOT NULL UNIQUE,
+          phone TEXT NOT NULL,
+          lead_name TEXT NOT NULL,
+          property_count TEXT,
+          extra_info TEXT,
+          run_at TIMESTAMPTZ NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending', 'sent', 'skipped', 'failed')),
+          sent_at TIMESTAMPTZ,
+          error TEXT,
+          wa_message_id TEXT,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+      `)
     } catch (error: any) {
       leadsDbInitPromise = null
       console.error('Error initializing leads database:', error)
@@ -666,6 +685,178 @@ export async function deleteWhatsAppDataForPhone(phone: string): Promise<void> {
   await query(`DELETE FROM whatsapp_message WHERE phone = $1`, [phone])
   await query(`DELETE FROM whatsapp_read_state WHERE phone = $1`, [phone])
   await query(`DELETE FROM whatsapp_contact WHERE phone = $1`, [phone])
+}
+
+export type WelcomeMessageJobStatus = 'pending' | 'sent' | 'skipped' | 'failed'
+
+export interface WelcomeMessageJobRow {
+  id: number
+  notion_page_id: string
+  phone: string
+  lead_name: string
+  property_count: string | null
+  extra_info: string | null
+  run_at: Date
+  status: WelcomeMessageJobStatus
+  sent_at: Date | null
+  error: string | null
+  wa_message_id: string | null
+  created_at: Date
+  updated_at: Date
+}
+
+const WELCOME_JOB_SELECT = `id, notion_page_id, phone, lead_name, property_count, extra_info, run_at, status, sent_at, error, wa_message_id, created_at, updated_at`
+
+function mapWelcomeMessageJobRow(row: any): WelcomeMessageJobRow {
+  return {
+    id: row.id,
+    notion_page_id: row.notion_page_id,
+    phone: row.phone,
+    lead_name: row.lead_name,
+    property_count: row.property_count,
+    extra_info: row.extra_info,
+    run_at: row.run_at,
+    status: row.status,
+    sent_at: row.sent_at,
+    error: row.error,
+    wa_message_id: row.wa_message_id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }
+}
+
+export async function scheduleWelcomeMessage(params: {
+  notionPageId: string
+  phone: string
+  leadName: string
+  propertyCount: string | null
+  delayMinutes: number
+}): Promise<void> {
+  await initializeLeadsDatabase()
+  const delayMinutes = Math.max(0, params.delayMinutes)
+
+  await query(
+    `INSERT INTO welcome_message_job (
+       notion_page_id, phone, lead_name, property_count, run_at, status
+     )
+     VALUES ($1, $2, $3, $4, NOW() + ($5 * INTERVAL '1 minute'), 'pending')
+     ON CONFLICT (notion_page_id) DO NOTHING`,
+    [
+      params.notionPageId,
+      params.phone,
+      params.leadName,
+      params.propertyCount,
+      delayMinutes,
+    ]
+  )
+}
+
+export async function updateWelcomeMessagePayload(params: {
+  notionPageId: string
+  extraInfo: string
+}): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(
+    `UPDATE welcome_message_job
+     SET extra_info = $2, updated_at = CURRENT_TIMESTAMP
+     WHERE notion_page_id = $1 AND status = 'pending'`,
+    [params.notionPageId, params.extraInfo]
+  )
+}
+
+export async function getWelcomeMessageJobByNotionPageId(
+  notionPageId: string
+): Promise<WelcomeMessageJobRow | null> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT ${WELCOME_JOB_SELECT}
+     FROM welcome_message_job
+     WHERE notion_page_id = $1`,
+    [notionPageId]
+  )
+  return result.rows[0] ? mapWelcomeMessageJobRow(result.rows[0]) : null
+}
+
+export async function claimDueWelcomeMessages(
+  limit = 20
+): Promise<WelcomeMessageJobRow[]> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT ${WELCOME_JOB_SELECT}
+     FROM welcome_message_job
+     WHERE status = 'pending' AND run_at <= NOW()
+     ORDER BY run_at ASC
+     LIMIT $1`,
+    [limit]
+  )
+  return result.rows.map(mapWelcomeMessageJobRow)
+}
+
+export async function markWelcomeMessageSent(params: {
+  jobId: number
+  waMessageId: string
+}): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(
+    `UPDATE welcome_message_job
+     SET status = 'sent',
+         sent_at = CURRENT_TIMESTAMP,
+         wa_message_id = $2,
+         error = NULL,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1`,
+    [params.jobId, params.waMessageId]
+  )
+}
+
+export async function markWelcomeMessageFailed(params: {
+  jobId: number
+  error: string
+}): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(
+    `UPDATE welcome_message_job
+     SET status = 'failed',
+         error = $2,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1`,
+    [params.jobId, params.error]
+  )
+}
+
+export async function markWelcomeMessageSkipped(params: {
+  jobId: number
+  reason: string
+}): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(
+    `UPDATE welcome_message_job
+     SET status = 'skipped',
+         error = $2,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1`,
+    [params.jobId, params.reason]
+  )
+}
+
+export async function hasInboundWhatsAppMessages(phone: string): Promise<boolean> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT 1 FROM whatsapp_message
+     WHERE phone = $1 AND direction = 'inbound'
+     LIMIT 1`,
+    [phone]
+  )
+  return result.rows.length > 0
+}
+
+export async function deleteWelcomeMessageJobForNotionPage(
+  notionPageId: string
+): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(`DELETE FROM welcome_message_job WHERE notion_page_id = $1`, [
+    notionPageId,
+  ])
 }
 
 export default pool

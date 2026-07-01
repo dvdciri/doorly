@@ -8,11 +8,14 @@ import {
 } from '@/lib/notion'
 import {
   deleteWhatsAppDataForPhone,
+  deleteWelcomeMessageJobForNotionPage,
   getUnreadWhatsAppPhones,
+  getWelcomeMessageJobByNotionPageId,
   getWhatsAppMediaPathnamesForPhone,
 } from '@/lib/db'
 import { deleteWhatsAppMediaBlobs } from '@/lib/blob'
 import { normalizeUKPhone } from '@/lib/phone'
+import { serializeWelcomeMessageJob } from '@/lib/welcome-message'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +45,7 @@ export async function GET(
     const unread = normalizedPhone
       ? unreadPhones.find((item) => item.phone === normalizedPhone)
       : undefined
+    const welcomeMessageJob = await getWelcomeMessageJobByNotionPageId(params.pageId)
 
     return NextResponse.json({
       lead: {
@@ -51,6 +55,9 @@ export async function GET(
       },
       comments,
       commentsError,
+      welcomeMessage: welcomeMessageJob
+        ? serializeWelcomeMessageJob(welcomeMessageJob)
+        : null,
     })
   } catch (error: any) {
     console.error('Error fetching lead:', error)
@@ -115,6 +122,7 @@ export async function DELETE(
       await deleteWhatsAppMediaBlobs(pathnames)
     }
 
+    await deleteWelcomeMessageJobForNotionPage(params.pageId)
     await archiveLead(params.pageId)
 
     return NextResponse.json({ success: true })

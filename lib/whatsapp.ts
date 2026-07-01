@@ -83,6 +83,67 @@ export async function sendTextMessage(toPhone: string, body: string): Promise<{
   return { messageId }
 }
 
+export type WhatsAppTemplateMessageOptions = {
+  templateName: string
+  languageCode: string
+  bodyParameters: string[]
+}
+
+export async function sendTemplateMessage(
+  toPhone: string,
+  options: WhatsAppTemplateMessageOptions
+): Promise<{ messageId: string }> {
+  const waPhone = toWhatsAppPhone(toPhone)
+  if (!waPhone) {
+    throw new Error('Invalid phone number for WhatsApp')
+  }
+
+  const phoneNumberId = getPhoneNumberId()
+  const components =
+    options.bodyParameters.length > 0
+      ? [
+          {
+            type: 'body',
+            parameters: options.bodyParameters.map((text) => ({
+              type: 'text',
+              text,
+            })),
+          },
+        ]
+      : undefined
+
+  const response = await fetch(`${WHATSAPP_API_BASE}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: waPhone,
+      type: 'template',
+      template: {
+        name: options.templateName,
+        language: { code: options.languageCode },
+        ...(components ? { components } : {}),
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`WhatsApp API error: ${response.status} - ${errorText}`)
+  }
+
+  const data = await response.json()
+  const messageId = data.messages?.[0]?.id
+  if (!messageId) {
+    throw new Error('WhatsApp API did not return a message ID')
+  }
+
+  return { messageId }
+}
+
 export function verifyWebhookToken(token: string | null): boolean {
   const expected = process.env.WHATSAPP_VERIFY_TOKEN
   return Boolean(expected && token === expected)

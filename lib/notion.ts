@@ -336,6 +336,14 @@ export async function updateLeadStage(pageId: string, stage: string): Promise<vo
 }
 
 /**
+ * Check whether a lead page has been archived in Notion
+ */
+export async function isLeadArchived(pageId: string): Promise<boolean> {
+  const page = await notionFetch(`/pages/${pageId}`)
+  return Boolean(page.archived)
+}
+
+/**
  * Archive a lead page (Notion does not hard-delete pages)
  */
 export async function archiveLead(pageId: string): Promise<void> {

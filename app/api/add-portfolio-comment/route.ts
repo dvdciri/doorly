@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { updateLeadExtraInformation } from '@/lib/notion'
-import { query, initializePortfolioDatabase } from '@/lib/db'
+import { query, initializePortfolioDatabase, updateWelcomeMessagePayload } from '@/lib/db'
 
 export async function POST(request: Request) {
   try {
@@ -50,6 +50,18 @@ export async function POST(request: Request) {
         await updateLeadExtraInformation(notionPageId, trimmedComment)
       } catch (notionError: any) {
         console.error('Failed to update Notion extra information:', notionError.message || notionError)
+      }
+
+      try {
+        await updateWelcomeMessagePayload({
+          notionPageId,
+          extraInfo: trimmedComment,
+        })
+      } catch (welcomeError: any) {
+        console.error(
+          'Failed to update welcome message payload:',
+          welcomeError.message || welcomeError
+        )
       }
     }
 

@@ -47,6 +47,16 @@ interface NotionComment {
   createdBy: string | null
 }
 
+interface WelcomeMessageJob {
+  id: number
+  notionPageId: string
+  status: 'pending' | 'sent' | 'skipped' | 'failed'
+  runAt: string
+  sentAt: string | null
+  error: string | null
+  previewBody: string | null
+}
+
 interface ChatMessage {
   id: number
   direction: 'inbound' | 'outbound'
@@ -66,6 +76,21 @@ interface ChatContact {
 
 function encodePhoneForUrl(phone: string): string {
   return encodeURIComponent(phone)
+}
+
+function getWelcomeMessageStatusLabel(job: WelcomeMessageJob): string {
+  switch (job.status) {
+    case 'pending':
+      return `Scheduled for ${formatUKDateTime(job.runAt)}`
+    case 'sent':
+      return job.sentAt ? `Sent at ${formatUKDateTime(job.sentAt)}` : 'Sent'
+    case 'skipped':
+      return job.error ? `Skipped: ${job.error}` : 'Skipped'
+    case 'failed':
+      return job.error ? `Failed: ${job.error}` : 'Failed to send'
+    default:
+      return job.status
+  }
 }
 
 function sortChatMessages(messages: ChatMessage[]): ChatMessage[] {
@@ -291,6 +316,7 @@ export default function LeadsPipelinePage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [comments, setComments] = useState<NotionComment[]>([])
+  const [welcomeMessage, setWelcomeMessage] = useState<WelcomeMessageJob | null>(null)
   const [commentsError, setCommentsError] = useState<string | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [newComment, setNewComment] = useState('')
@@ -345,6 +371,7 @@ export default function LeadsPipelinePage() {
       setSelectedLead(data.lead)
       setComments(data.comments || [])
       setCommentsError(data.commentsError || null)
+      setWelcomeMessage(data.welcomeMessage || null)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load lead'
       setDetailError(message)
@@ -455,6 +482,7 @@ export default function LeadsPipelinePage() {
     setDeleteConfirming(false)
     setDeleteError(null)
     setCommentDeleteError(null)
+    setWelcomeMessage(null)
   }, [])
 
   useEffect(() => {
@@ -875,6 +903,19 @@ export default function LeadsPipelinePage() {
                             <p className="text-gray-200 text-sm bg-navy-800/50 rounded-lg p-4 whitespace-pre-wrap">
                               {selectedLead.extraInformation}
                             </p>
+                          </div>
+                        )}
+                        {welcomeMessage && (
+                          <div className="mt-3">
+                            <p className="text-gray-400 text-xs mb-1">Welcome message</p>
+                            <p className="text-gray-200 text-sm bg-navy-800/50 rounded-lg p-4">
+                              {getWelcomeMessageStatusLabel(welcomeMessage)}
+                            </p>
+                            {welcomeMessage.previewBody && (
+                              <p className="text-gray-400 text-xs mt-2 whitespace-pre-wrap">
+                                {welcomeMessage.previewBody}
+                              </p>
+                            )}
                           </div>
                         )}
                         <a
