@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob'
+import { del, put } from '@vercel/blob'
 
 const MIME_EXTENSION: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -45,4 +45,23 @@ export async function uploadWhatsAppMedia(
     allowOverwrite: true,
   })
   return result.pathname
+}
+
+export async function deleteWhatsAppMediaBlobs(pathnames: string[]): Promise<void> {
+  if (pathnames.length === 0) {
+    return
+  }
+
+  try {
+    await del(pathnames)
+  } catch (error) {
+    console.error('Error deleting WhatsApp media blobs:', error)
+    for (const pathname of pathnames) {
+      try {
+        await del(pathname)
+      } catch (individualError) {
+        console.error(`Failed to delete blob ${pathname}:`, individualError)
+      }
+    }
+  }
 }

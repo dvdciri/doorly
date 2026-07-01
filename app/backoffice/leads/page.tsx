@@ -17,6 +17,7 @@ import {
   CheckCheck,
   AlertCircle,
   Play,
+  Trash2,
 } from 'lucide-react'
 import { validateUKPhone, formatUKPhone } from '@/lib/phone'
 import { formatUKDateTime, getInitials } from '@/lib/datetime'
@@ -285,6 +286,7 @@ export default function LeadsPipelinePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [columns, setColumns] = useState<PipelineColumn[]>([])
+  const [stages, setStages] = useState<string[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
@@ -298,6 +300,13 @@ export default function LeadsPipelinePage() {
   const [chatLoading, setChatLoading] = useState(false)
   const [newMessage, setNewMessage] = useState('')
   const [messageSending, setMessageSending] = useState(false)
+  const [stageSaving, setStageSaving] = useState(false)
+  const [stageError, setStageError] = useState<string | null>(null)
+  const [deleteConfirming, setDeleteConfirming] = useState(false)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
+  const [commentDeleteError, setCommentDeleteError] = useState<string | null>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
   const scrollSmoothOnNextRef = useRef(false)
   const isAtBottomRef = useRef(true)
@@ -315,6 +324,7 @@ export default function LeadsPipelinePage() {
 
       const leadsData = await leadsRes.json()
       setColumns(leadsData.columns || [])
+      setStages(leadsData.stages || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load pipeline')
     } finally {
@@ -441,6 +451,10 @@ export default function LeadsPipelinePage() {
     setDetailError(null)
     setChatContact(null)
     setChatMessages([])
+    setStageError(null)
+    setDeleteConfirming(false)
+    setDeleteError(null)
+    setCommentDeleteError(null)
   }, [])
 
   useEffect(() => {
@@ -476,7 +490,87 @@ export default function LeadsPipelinePage() {
   const openLead = (lead: Lead) => {
     setSelectedLead(lead)
     setDetailError(null)
+    setStageError(null)
+    setDeleteConfirming(false)
+    setDeleteError(null)
+    setCommentDeleteError(null)
     setSelectedLeadId(lead.id)
+  }
+
+  const handleStageChange = async (newStage: string) => {
+    if (!selectedLeadId || !selectedLead || newStage === selectedLead.stage) return
+
+    const previousStage = selectedLead.stage
+    setStageSaving(true)
+    setStageError(null)
+    setSelectedLead({ ...selectedLead, stage: newStage })
+
+    try {
+      const response = await fetch(`/api/backoffice/leads/${selectedLeadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newStage }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to update stage')
+      }
+      const data = await response.json()
+      setSelectedLead(data.lead)
+      await fetchPipeline()
+    } catch (err) {
+      setSelectedLead((prev) => (prev ? { ...prev, stage: previousStage } : prev))
+      setStageError(err instanceof Error ? err.message : 'Failed to update stage')
+    } finally {
+      setStageSaving(false)
+    }
+  }
+
+  const handleDeleteLead = async () => {
+    if (!selectedLeadId) return
+
+    setDeleteSubmitting(true)
+    setDeleteError(null)
+    try {
+      const response = await fetch(`/api/backoffice/leads/${selectedLeadId}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete lead')
+      }
+      closeLead()
+      await fetchPipeline()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete lead')
+      setDeleteConfirming(false)
+    } finally {
+      setDeleteSubmitting(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!selectedLeadId) return
+
+    setDeletingCommentId(commentId)
+    setCommentDeleteError(null)
+    try {
+      const response = await fetch(
+        `/api/backoffice/leads/${selectedLeadId}/comments/${commentId}`,
+        { method: 'DELETE' }
+      )
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete comment')
+      }
+      setComments((prev) => prev.filter((c) => c.id !== commentId))
+    } catch (err) {
+      setCommentDeleteError(
+        err instanceof Error ? err.message : 'Failed to delete comment'
+      )
+    } finally {
+      setDeletingCommentId(null)
+    }
   }
 
   const handleAddComment = async (e: React.FormEvent) => {
@@ -649,22 +743,56 @@ export default function LeadsPipelinePage() {
             onClick={closeLead}
           />
           <div className="relative w-full max-w-[min(1600px,98vw)] h-[min(920px,96vh)] bg-navy-900 border border-accent-red/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex-shrink-0 border-b border-navy-700 px-6 py-4 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-50">
+            <div className="flex-shrink-0 border-b border-navy-700 px-6 py-4 flex justify-between items-center gap-4">
+              <div className="min-w-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-50 truncate">
                   {selectedLead?.name || 'Lead details'}
                 </h2>
                 {selectedLead?.stage && (
                   <p className="text-sm text-gray-400 mt-0.5">{selectedLead.stage}</p>
                 )}
               </div>
-              <button
-                onClick={closeLead}
-                className="p-2 text-gray-400 hover:text-accent-red transition-colors rounded-lg hover:bg-navy-800"
-                aria-label="Close"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {selectedLead && !deleteConfirming && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirming(true)}
+                    disabled={deleteSubmitting}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete lead
+                  </button>
+                )}
+                {deleteConfirming && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-400">Confirm delete?</span>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirming(false)}
+                      disabled={deleteSubmitting}
+                      className="px-3 py-1.5 text-sm text-gray-300 hover:text-gray-50 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteLead}
+                      disabled={deleteSubmitting}
+                      className="px-3 py-1.5 text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {deleteSubmitting ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={closeLead}
+                  className="p-2 text-gray-400 hover:text-accent-red transition-colors rounded-lg hover:bg-navy-800"
+                  aria-label="Close"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -677,6 +805,12 @@ export default function LeadsPipelinePage() {
               {detailError && (
                 <div className="mx-6 mt-6 bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
                   {detailError}
+                </div>
+              )}
+
+              {deleteError && (
+                <div className="mx-6 mt-6 bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+                  {deleteError}
                 </div>
               )}
 
@@ -694,7 +828,29 @@ export default function LeadsPipelinePage() {
                         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                           <div>
                             <dt className="text-gray-400">Stage</dt>
-                            <dd className="text-gray-50 mt-0.5">{selectedLead.stage || '—'}</dd>
+                            <dd className="mt-0.5">
+                              <select
+                                value={selectedLead.stage || ''}
+                                onChange={(e) => handleStageChange(e.target.value)}
+                                disabled={stageSaving || stages.length === 0}
+                                className="w-full px-2 py-1.5 bg-navy-800/50 border border-navy-700 rounded-lg text-gray-50 text-sm focus:ring-2 focus:ring-accent-red focus:border-transparent outline-none disabled:opacity-50"
+                              >
+                                {!selectedLead.stage && (
+                                  <option value="">Unassigned</option>
+                                )}
+                                {stages.map((stage) => (
+                                  <option key={stage} value={stage}>
+                                    {stage}
+                                  </option>
+                                ))}
+                              </select>
+                              {stageSaving && (
+                                <p className="text-xs text-gray-500 mt-1">Saving...</p>
+                              )}
+                              {stageError && (
+                                <p className="text-xs text-red-400 mt-1">{stageError}</p>
+                              )}
+                            </dd>
                           </div>
                           <div>
                             <dt className="text-gray-400">Phone</dt>
@@ -753,7 +909,22 @@ export default function LeadsPipelinePage() {
                                   key={comment.id}
                                   className="bg-navy-800/50 rounded-lg p-3 text-sm text-gray-200"
                                 >
-                                  <p>{comment.text}</p>
+                                  <div className="flex justify-between items-start gap-2">
+                                    <p className="flex-1 min-w-0">{comment.text}</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteComment(comment.id)}
+                                      disabled={deletingCommentId === comment.id}
+                                      className="flex-shrink-0 p-1 text-gray-500 hover:text-red-400 transition-colors disabled:opacity-50"
+                                      aria-label="Delete comment"
+                                    >
+                                      {deletingCommentId === comment.id ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  </div>
                                   <p className="text-xs text-gray-500 mt-1">
                                     {new Date(comment.createdTime).toLocaleString()}
                                   </p>
@@ -761,6 +932,9 @@ export default function LeadsPipelinePage() {
                               ))}
                             </ul>
                           )
+                        )}
+                        {commentDeleteError && (
+                          <p className="text-xs text-red-400">{commentDeleteError}</p>
                         )}
                         <form onSubmit={handleAddComment} className="space-y-2">
                           <textarea

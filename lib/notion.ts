@@ -315,3 +315,41 @@ export function groupLeadsByStage(
 
   return columns
 }
+
+/**
+ * Update the Stage select property on a lead page
+ */
+export async function updateLeadStage(pageId: string, stage: string): Promise<void> {
+  const { stages } = await getLeadsDatabase()
+  if (!stages.includes(stage)) {
+    throw new Error(`Invalid stage: ${stage}`)
+  }
+
+  await notionFetch(`/pages/${pageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      properties: {
+        Stage: { select: { name: stage } },
+      },
+    }),
+  })
+}
+
+/**
+ * Archive a lead page (Notion does not hard-delete pages)
+ */
+export async function archiveLead(pageId: string): Promise<void> {
+  await notionFetch(`/pages/${pageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ archived: true }),
+  })
+}
+
+/**
+ * Delete a comment by ID (only comments created by this integration can be deleted)
+ */
+export async function deleteNotionComment(commentId: string): Promise<void> {
+  await notionFetch(`/comments/${commentId}`, {
+    method: 'DELETE',
+  })
+}

@@ -650,5 +650,23 @@ export async function getUnreadWhatsAppPhones(): Promise<
   }))
 }
 
+export async function getWhatsAppMediaPathnamesForPhone(phone: string): Promise<string[]> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT DISTINCT media_blob_pathname
+     FROM whatsapp_message
+     WHERE phone = $1 AND media_blob_pathname IS NOT NULL`,
+    [phone]
+  )
+  return result.rows.map((row) => row.media_blob_pathname).filter(Boolean)
+}
+
+export async function deleteWhatsAppDataForPhone(phone: string): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(`DELETE FROM whatsapp_message WHERE phone = $1`, [phone])
+  await query(`DELETE FROM whatsapp_read_state WHERE phone = $1`, [phone])
+  await query(`DELETE FROM whatsapp_contact WHERE phone = $1`, [phone])
+}
+
 export default pool
 
