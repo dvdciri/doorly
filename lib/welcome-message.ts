@@ -11,29 +11,51 @@ import { isLeadArchived } from '@/lib/notion'
 import { normalizeUKPhone } from '@/lib/phone'
 import { sendTemplateMessage } from '@/lib/whatsapp'
 
-const DEFAULT_TEMPLATE_PREVIEW =
-  "Hi {{1}}, thanks for reaching out about your {{2}} properties. {{3}} We'll be in touch shortly."
+const DEFAULT_TEMPLATE_PREVIEW = `Hey {{name}}, my name is Davide from Doorly Properties ☺️
+
+I saw your enquiry on our social post, you're considering selling {{n_of_properties}} properties, is that correct?`
+
+export type WelcomeTemplateVariables = {
+  name: string
+  n_of_properties: string
+}
 
 export function isWelcomeMessageEnabled(): boolean {
   return process.env.WELCOME_MESSAGE_ENABLED === 'true'
 }
 
-export function buildWelcomeTemplateParameters(job: WelcomeMessageJobRow): string[] {
-  return [
-    job.lead_name,
-    job.property_count || 'your',
-    job.extra_info || '',
-  ]
+export function getFirstName(fullName: string): string {
+  const trimmed = fullName.trim()
+  if (!trimmed) {
+    return ''
+  }
+  return trimmed.split(/\s+/)[0]
 }
 
-export function renderWelcomeMessagePreview(parameters: string[]): string {
+export function buildWelcomeTemplateVariables(
+  job: WelcomeMessageJobRow
+): WelcomeTemplateVariables {
+  return {
+    name: getFirstName(job.lead_name),
+    n_of_properties: job.property_count || 'some',
+  }
+}
+
+/** Body parameters in template order: name, then n_of_properties */
+export function buildWelcomeTemplateParameters(job: WelcomeMessageJobRow): string[] {
+  const { name, n_of_properties } = buildWelcomeTemplateVariables(job)
+  return [name, n_of_properties]
+}
+
+export function renderWelcomeMessagePreview(
+  variables: WelcomeTemplateVariables
+): string {
   const template =
     process.env.WHATSAPP_WELCOME_TEMPLATE_PREVIEW || DEFAULT_TEMPLATE_PREVIEW
 
-  return template.replace(/\{\{(\d+)\}\}/g, (_, index: string) => {
-    const parameterIndex = parseInt(index, 10) - 1
-    return parameters[parameterIndex] ?? ''
-  })
+  return template
+    .replace(/\{\{name\}\}/g, variables.name)
+    .replace(/\{\{n_of_properties\}\}/g, variables.n_of_properties)
 }
 
 function getWelcomeTemplateConfig(): {
@@ -84,14 +106,14 @@ export async function processWelcomeMessageJob(
       return 'skipped'
     }
 
-    const bodyParameters = buildWelcomeTemplateParameters(job)
-    const previewBody = renderWelcomeMessagePreview(bodyParameters)
+    const variables = buildWelcomeTemplateVariables(job)
+    const previewBody = renderWelcomeMessagePreview(variables)
     const { templateName, languageCode } = getWelcomeTemplateConfig()
 
     const { messageId } = await sendTemplateMessage(normalizedPhone, {
       templateName,
       languageCode,
-      bodyParameters,
+      bodyParameters: buildWelcomeTemplateParameters(job),
     })
 
     await insertWhatsAppMessage({
@@ -135,6 +157,8 @@ export async function sendWelcomeMessageForLead(params: {
 }
 
 export function serializeWelcomeMessageJob(job: WelcomeMessageJobRow) {
+  const variables = buildWelcomeTemplateVariables(job)
+
   return {
     id: job.id,
     notionPageId: job.notion_page_id,
@@ -144,7 +168,7 @@ export function serializeWelcomeMessageJob(job: WelcomeMessageJobRow) {
     error: job.error,
     previewBody:
       job.status === 'pending' || job.status === 'sent'
-        ? renderWelcomeMessagePreview(buildWelcomeTemplateParameters(job))
+        ? renderWelcomeMessagePreview(variables)
         : null,
   }
 }
