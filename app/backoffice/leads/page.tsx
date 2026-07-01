@@ -17,6 +17,7 @@ import {
   CheckCheck,
   AlertCircle,
   Play,
+  RotateCcw,
   Trash2,
 } from 'lucide-react'
 import { validateUKPhone, formatUKPhone } from '@/lib/phone'
@@ -333,6 +334,8 @@ export default function LeadsPipelinePage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
   const [commentDeleteError, setCommentDeleteError] = useState<string | null>(null)
+  const [welcomeMessageRetrying, setWelcomeMessageRetrying] = useState(false)
+  const [welcomeMessageRetryError, setWelcomeMessageRetryError] = useState<string | null>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
   const scrollSmoothOnNextRef = useRef(false)
   const isAtBottomRef = useRef(true)
@@ -361,6 +364,7 @@ export default function LeadsPipelinePage() {
   const fetchLeadDetail = useCallback(async (pageId: string) => {
     setDetailLoading(true)
     setDetailError(null)
+    setWelcomeMessageRetryError(null)
     try {
       const response = await fetch(`/api/backoffice/leads/${pageId}`)
       if (!response.ok) {
@@ -598,6 +602,36 @@ export default function LeadsPipelinePage() {
       )
     } finally {
       setDeletingCommentId(null)
+    }
+  }
+
+  const handleRetryWelcomeMessage = async () => {
+    if (!selectedLeadId) return
+
+    setWelcomeMessageRetrying(true)
+    setWelcomeMessageRetryError(null)
+    try {
+      const response = await fetch(
+        `/api/backoffice/leads/${selectedLeadId}/welcome-message`,
+        { method: 'POST' }
+      )
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to resend welcome message')
+      }
+
+      setWelcomeMessage(data.welcomeMessage || null)
+
+      if (data.result === 'sent' && selectedLead?.phone && canChat) {
+        await fetchChat(selectedLead.phone)
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to resend welcome message'
+      setWelcomeMessageRetryError(message)
+      await fetchLeadDetail(selectedLeadId)
+    } finally {
+      setWelcomeMessageRetrying(false)
     }
   }
 
@@ -907,10 +941,30 @@ export default function LeadsPipelinePage() {
                         )}
                         {welcomeMessage && (
                           <div className="mt-3">
-                            <p className="text-gray-400 text-xs mb-1">Welcome message</p>
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <p className="text-gray-400 text-xs">Welcome message</p>
+                              {welcomeMessage.status === 'failed' && (
+                                <button
+                                  type="button"
+                                  onClick={handleRetryWelcomeMessage}
+                                  disabled={welcomeMessageRetrying}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-300 hover:text-gray-50 bg-navy-800 hover:bg-navy-700 border border-navy-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {welcomeMessageRetrying ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <RotateCcw className="w-3 h-3" />
+                                  )}
+                                  Resend
+                                </button>
+                              )}
+                            </div>
                             <p className="text-gray-200 text-sm bg-navy-800/50 rounded-lg p-4">
                               {getWelcomeMessageStatusLabel(welcomeMessage)}
                             </p>
+                            {welcomeMessageRetryError && (
+                              <p className="text-red-400 text-xs mt-2">{welcomeMessageRetryError}</p>
+                            )}
                             {welcomeMessage.previewBody && (
                               <p className="text-gray-400 text-xs mt-2 whitespace-pre-wrap">
                                 {welcomeMessage.previewBody}

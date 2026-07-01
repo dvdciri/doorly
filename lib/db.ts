@@ -764,6 +764,23 @@ export async function getWelcomeMessageJobByNotionPageId(
   return result.rows[0] ? mapWelcomeMessageJobRow(result.rows[0]) : null
 }
 
+export async function resetWelcomeMessageJobForRetry(
+  jobId: number
+): Promise<WelcomeMessageJobRow | null> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `UPDATE welcome_message_job
+     SET status = 'pending',
+         error = NULL,
+         run_at = NOW(),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND status = 'failed'
+     RETURNING ${WELCOME_JOB_SELECT}`,
+    [jobId]
+  )
+  return result.rows[0] ? mapWelcomeMessageJobRow(result.rows[0]) : null
+}
+
 export async function markWelcomeMessageSent(params: {
   jobId: number
   waMessageId: string

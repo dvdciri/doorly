@@ -1,10 +1,12 @@
 import {
   createWelcomeMessageJob,
+  getWelcomeMessageJobByNotionPageId,
   hasInboundWhatsAppMessages,
   insertWhatsAppMessage,
   markWelcomeMessageFailed,
   markWelcomeMessageSent,
   markWelcomeMessageSkipped,
+  resetWelcomeMessageJobForRetry,
   type WelcomeMessageJobRow,
 } from '@/lib/db'
 import { isLeadArchived } from '@/lib/notion'
@@ -163,6 +165,25 @@ export async function sendWelcomeMessageForLead(params: {
   return processWelcomeMessageJob(job)
 }
 
+export async function retryWelcomeMessage(
+  notionPageId: string
+): Promise<'sent' | 'skipped' | 'failed' | 'not_found' | 'not_retryable'> {
+  const job = await getWelcomeMessageJobByNotionPageId(notionPageId)
+  if (!job) {
+    return 'not_found'
+  }
+  if (job.status !== 'failed') {
+    return 'not_retryable'
+  }
+
+  const resetJob = await resetWelcomeMessageJobForRetry(job.id)
+  if (!resetJob) {
+    return 'not_retryable'
+  }
+
+  return processWelcomeMessageJob(resetJob)
+}
+
 export function serializeWelcomeMessageJob(job: WelcomeMessageJobRow) {
   const variables = buildWelcomeTemplateVariables(job)
 
@@ -174,7 +195,7 @@ export function serializeWelcomeMessageJob(job: WelcomeMessageJobRow) {
     sentAt: job.sent_at?.toISOString() ?? null,
     error: job.error,
     previewBody:
-      job.status === 'pending' || job.status === 'sent'
+      job.status === 'pending' || job.status === 'sent' || job.status === 'failed'
         ? renderWelcomeMessagePreview(variables)
         : null,
   }
