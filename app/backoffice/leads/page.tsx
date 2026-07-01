@@ -16,6 +16,7 @@ import {
   Check,
   CheckCheck,
   AlertCircle,
+  Play,
 } from 'lucide-react'
 import { validateUKPhone, formatUKPhone } from '@/lib/phone'
 import { formatUKDateTime, getInitials } from '@/lib/datetime'
@@ -82,6 +83,128 @@ function isMediaPlaceholder(body: string): boolean {
   return /^\[(Image|Video|Audio)\]$/.test(body)
 }
 
+const MEDIA_THUMBNAIL_CLASS =
+  'w-[220px] h-[220px] max-w-full object-cover rounded-lg bg-navy-900/50'
+
+function MediaLightbox({
+  open,
+  onClose,
+  label,
+  children,
+}: {
+  open: boolean
+  onClose: () => void
+  label: string
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    if (!open) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [open, onClose])
+
+  if (!open) {
+    return null
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <div onClick={(event) => event.stopPropagation()}>{children}</div>
+    </div>
+  )
+}
+
+function ChatImagePreview({ src }: { src: string }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="block max-w-full overflow-hidden rounded-lg"
+        aria-label="Open image"
+      >
+        <img
+          src={src}
+          alt=""
+          className={MEDIA_THUMBNAIL_CLASS}
+          loading="lazy"
+        />
+      </button>
+      <MediaLightbox open={open} onClose={() => setOpen(false)} label="Image preview">
+        <img
+          src={src}
+          alt=""
+          className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+        />
+      </MediaLightbox>
+    </>
+  )
+}
+
+function ChatVideoPreview({ src }: { src: string }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="relative block max-w-full overflow-hidden rounded-lg"
+        aria-label="Open video"
+      >
+        <video
+          src={src}
+          muted
+          preload="metadata"
+          className={MEDIA_THUMBNAIL_CLASS}
+        />
+        <span className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+          <span className="flex items-center justify-center w-12 h-12 rounded-full bg-black/50 text-white">
+            <Play className="w-6 h-6 ml-0.5" fill="currentColor" />
+          </span>
+        </span>
+      </button>
+      <MediaLightbox open={open} onClose={() => setOpen(false)} label="Video preview">
+        <video
+          src={src}
+          controls
+          autoPlay
+          className="max-w-[90vw] max-h-[90vh] rounded-lg"
+        />
+      </MediaLightbox>
+    </>
+  )
+}
+
 function ChatMessageContent({ msg }: { msg: ChatMessage }) {
   const messageType = msg.messageType || 'text'
   const mediaUrl = `/api/backoffice/chat/media/${msg.id}`
@@ -91,12 +214,7 @@ function ChatMessageContent({ msg }: { msg: ChatMessage }) {
   if (messageType === 'image' && msg.hasMedia) {
     return (
       <>
-        <img
-          src={mediaUrl}
-          alt=""
-          className="max-w-full rounded-lg"
-          loading="lazy"
-        />
+        <ChatImagePreview src={mediaUrl} />
         {showCaption && <p className="mt-2 whitespace-pre-wrap">{msg.body}</p>}
       </>
     )
@@ -105,12 +223,7 @@ function ChatMessageContent({ msg }: { msg: ChatMessage }) {
   if (messageType === 'video' && msg.hasMedia) {
     return (
       <>
-        <video
-          src={mediaUrl}
-          controls
-          className="max-w-full rounded-lg"
-          preload="metadata"
-        />
+        <ChatVideoPreview src={mediaUrl} />
         {showCaption && <p className="mt-2 whitespace-pre-wrap">{msg.body}</p>}
       </>
     )
