@@ -1,23 +1,23 @@
-import { Pool, type PoolClient } from 'pg'
+import { Pool } from 'pg'
+
+function withUtcTimezone(connectionString: string | undefined): string | undefined {
+  if (!connectionString) {
+    return connectionString
+  }
+  if (/timezone=/i.test(connectionString)) {
+    return connectionString
+  }
+  const separator = connectionString.includes('?') ? '&' : '?'
+  return `${connectionString}${separator}options=-c%20timezone%3DUTC`
+}
 
 // Create a connection pool
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: withUtcTimezone(process.env.DATABASE_URL),
   ssl: {
     rejectUnauthorized: false,
   },
 })
-
-async function ensureUtcSession(client: PoolClient): Promise<void> {
-  await client.query("SET TIME ZONE 'UTC'")
-}
-
-const originalConnect = pool.connect.bind(pool)
-pool.connect = (async (...args: Parameters<typeof pool.connect>) => {
-  const client = await originalConnect(...args)
-  await ensureUtcSession(client)
-  return client
-}) as typeof pool.connect
 
 // Handle pool errors
 pool.on('error', (err) => {
