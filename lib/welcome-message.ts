@@ -11,10 +11,6 @@ import { isLeadArchived } from '@/lib/notion'
 import { normalizeUKPhone } from '@/lib/phone'
 import { sendTemplateMessage } from '@/lib/whatsapp'
 
-const DEFAULT_TEMPLATE_PREVIEW = `Hey {{name}}, my name is Davide from Doorly Properties ☺️
-
-I saw your enquiry on our social post, you're considering selling {{n_of_properties}} properties, is that correct?`
-
 export type WelcomeTemplateVariables = {
   name: string
   n_of_properties: string
@@ -49,13 +45,22 @@ export function buildWelcomeTemplateParameters(job: WelcomeMessageJobRow): strin
 
 export function renderWelcomeMessagePreview(
   variables: WelcomeTemplateVariables
-): string {
-  const template =
-    process.env.WHATSAPP_WELCOME_TEMPLATE_PREVIEW || DEFAULT_TEMPLATE_PREVIEW
+): string | null {
+  const template = process.env.WHATSAPP_WELCOME_TEMPLATE_PREVIEW
+  if (!template) {
+    return null
+  }
 
   return template
     .replace(/\{\{name\}\}/g, variables.name)
     .replace(/\{\{n_of_properties\}\}/g, variables.n_of_properties)
+}
+
+function formatWelcomeMessageRecord(
+  templateName: string,
+  variables: WelcomeTemplateVariables
+): string {
+  return `[${templateName}] name=${variables.name}, n_of_properties=${variables.n_of_properties}`
 }
 
 function getWelcomeTemplateConfig(): {
@@ -107,8 +112,10 @@ export async function processWelcomeMessageJob(
     }
 
     const variables = buildWelcomeTemplateVariables(job)
-    const previewBody = renderWelcomeMessagePreview(variables)
     const { templateName, languageCode } = getWelcomeTemplateConfig()
+    const previewBody =
+      renderWelcomeMessagePreview(variables) ??
+      formatWelcomeMessageRecord(templateName, variables)
 
     const { messageId } = await sendTemplateMessage(normalizedPhone, {
       templateName,
