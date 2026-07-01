@@ -1,5 +1,5 @@
 import {
-  claimDueWelcomeMessages,
+  createWelcomeMessageJob,
   hasInboundWhatsAppMessages,
   insertWhatsAppMessage,
   markWelcomeMessageFailed,
@@ -16,14 +16,6 @@ const DEFAULT_TEMPLATE_PREVIEW =
 
 export function isWelcomeMessageEnabled(): boolean {
   return process.env.WELCOME_MESSAGE_ENABLED === 'true'
-}
-
-export function getWelcomeMessageDelayMinutes(): number {
-  const parsed = parseInt(process.env.WELCOME_MESSAGE_DELAY_MINUTES || '5', 10)
-  if (Number.isNaN(parsed) || parsed < 0) {
-    return 5
-  }
-  return parsed
 }
 
 export function buildWelcomeTemplateParameters(job: WelcomeMessageJobRow): string[] {
@@ -128,35 +120,18 @@ export async function processWelcomeMessageJob(
   }
 }
 
-export async function processDueWelcomeMessages(limit = 20): Promise<{
-  processed: number
-  sent: number
-  skipped: number
-  failed: number
-}> {
-  const jobs = await claimDueWelcomeMessages(limit)
-
-  let sent = 0
-  let skipped = 0
-  let failed = 0
-
-  for (const job of jobs) {
-    const result = await processWelcomeMessageJob(job)
-    if (result === 'sent') {
-      sent += 1
-    } else if (result === 'failed') {
-      failed += 1
-    } else {
-      skipped += 1
-    }
+export async function sendWelcomeMessageForLead(params: {
+  notionPageId: string
+  phone: string
+  leadName: string
+  propertyCount: string | null
+}): Promise<'sent' | 'skipped' | 'failed'> {
+  const job = await createWelcomeMessageJob(params)
+  if (!job) {
+    return 'skipped'
   }
 
-  return {
-    processed: jobs.length,
-    sent,
-    skipped,
-    failed,
-  }
+  return processWelcomeMessageJob(job)
 }
 
 export function serializeWelcomeMessageJob(job: WelcomeMessageJobRow) {

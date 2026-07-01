@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { query, initializePortfolioDatabase, scheduleWelcomeMessage } from '@/lib/db'
+import { query, initializePortfolioDatabase } from '@/lib/db'
 import { sendPortfolioSubmissionEmail } from '@/lib/email'
 import { sendLeadEvent } from '@/lib/facebook-conversions'
 import { sendPortfolioLeadToNotion } from '@/lib/notion'
 import { validateUKPhone, normalizeUKPhone } from '@/lib/phone'
 import {
-  getWelcomeMessageDelayMinutes,
   isWelcomeMessageEnabled,
+  sendWelcomeMessageForLead,
 } from '@/lib/welcome-message'
 
 export async function POST(request: Request) {
@@ -103,16 +103,15 @@ export async function POST(request: Request) {
 
     if (notionPageId && isWelcomeMessageEnabled()) {
       try {
-        await scheduleWelcomeMessage({
+        await sendWelcomeMessageForLead({
           notionPageId,
           phone: sanitizedPhone,
           leadName: sanitizedName,
           propertyCount: sanitizedPropertyCount,
-          delayMinutes: getWelcomeMessageDelayMinutes(),
         })
       } catch (welcomeError: any) {
         console.error(
-          'Failed to schedule welcome message, but form submission succeeded:',
+          'Failed to send welcome message, but form submission succeeded:',
           welcomeError.message || welcomeError
         )
       }

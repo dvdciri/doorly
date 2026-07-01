@@ -725,43 +725,30 @@ function mapWelcomeMessageJobRow(row: any): WelcomeMessageJobRow {
   }
 }
 
-export async function scheduleWelcomeMessage(params: {
+export async function createWelcomeMessageJob(params: {
   notionPageId: string
   phone: string
   leadName: string
   propertyCount: string | null
-  delayMinutes: number
-}): Promise<void> {
+}): Promise<WelcomeMessageJobRow | null> {
   await initializeLeadsDatabase()
-  const delayMinutes = Math.max(0, params.delayMinutes)
 
-  await query(
+  const result = await query(
     `INSERT INTO welcome_message_job (
        notion_page_id, phone, lead_name, property_count, run_at, status
      )
-     VALUES ($1, $2, $3, $4, NOW() + ($5 * INTERVAL '1 minute'), 'pending')
-     ON CONFLICT (notion_page_id) DO NOTHING`,
+     VALUES ($1, $2, $3, $4, NOW(), 'pending')
+     ON CONFLICT (notion_page_id) DO NOTHING
+     RETURNING ${WELCOME_JOB_SELECT}`,
     [
       params.notionPageId,
       params.phone,
       params.leadName,
       params.propertyCount,
-      delayMinutes,
     ]
   )
-}
 
-export async function updateWelcomeMessagePayload(params: {
-  notionPageId: string
-  extraInfo: string
-}): Promise<void> {
-  await initializeLeadsDatabase()
-  await query(
-    `UPDATE welcome_message_job
-     SET extra_info = $2, updated_at = CURRENT_TIMESTAMP
-     WHERE notion_page_id = $1 AND status = 'pending'`,
-    [params.notionPageId, params.extraInfo]
-  )
+  return result.rows[0] ? mapWelcomeMessageJobRow(result.rows[0]) : null
 }
 
 export async function getWelcomeMessageJobByNotionPageId(
@@ -775,21 +762,6 @@ export async function getWelcomeMessageJobByNotionPageId(
     [notionPageId]
   )
   return result.rows[0] ? mapWelcomeMessageJobRow(result.rows[0]) : null
-}
-
-export async function claimDueWelcomeMessages(
-  limit = 20
-): Promise<WelcomeMessageJobRow[]> {
-  await initializeLeadsDatabase()
-  const result = await query(
-    `SELECT ${WELCOME_JOB_SELECT}
-     FROM welcome_message_job
-     WHERE status = 'pending' AND run_at <= NOW()
-     ORDER BY run_at ASC
-     LIMIT $1`,
-    [limit]
-  )
-  return result.rows.map(mapWelcomeMessageJobRow)
 }
 
 export async function markWelcomeMessageSent(params: {
