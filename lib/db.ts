@@ -222,5 +222,147 @@ export async function initializePortfolioDatabase() {
   }
 }
 
+export interface WhatsAppMessageRow {
+  id: number
+  wa_message_id: string | null
+  phone: string
+  direction: 'inbound' | 'outbound'
+  body: string
+  wa_timestamp: Date
+  notion_page_id: string | null
+  created_at: Date
+}
+
+let leadsDbInitPromise: Promise<void> | null = null
+
+export async function initializeLeadsDatabase() {
+  if (leadsDbInitPromise) {
+    return leadsDbInitPromise
+  }
+
+  leadsDbInitPromise = (async () => {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS whatsapp_message (
+          id SERIAL PRIMARY KEY,
+          wa_message_id TEXT UNIQUE,
+          phone TEXT NOT NULL,
+          direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+          body TEXT NOT NULL,
+          wa_timestamp TIMESTAMP NOT NULL,
+          notion_page_id TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `)
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS whatsapp_read_state (
+          phone TEXT PRIMARY KEY,
+          last_read_at TIMESTAMP NOT NULL
+        );
+      `)
+    } catch (error: any) {
+      leadsDbInitPromise = null
+      console.error('Error initializing leads database:', error)
+      throw error
+    }
+  })()
+
+  return leadsDbInitPromise
+}
+
+export async function insertWhatsAppMessage(params: {
+  waMessageId?: string | null
+  phone: string
+  direction: 'inbound' | 'outbound'
+  body: string
+  waTimestamp: Date
+  notionPageId?: string | null
+}): Promise<WhatsAppMessageRow> {
+  await initializeLeadsDatabase()
+
+  const result = await query(
+    `INSERT INTO whatsapp_message (wa_message_id, phone, direction, body, wa_timestamp, notion_page_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (wa_message_id) DO NOTHING
+     RETURNING id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, created_at`,
+    [
+      params.waMessageId || null,
+      params.phone,
+      params.direction,
+      params.body,
+      params.waTimestamp,
+      params.notionPageId || null,
+    ]
+  )
+
+  if (result.rows.length > 0) {
+    return result.rows[0]
+  }
+
+  if (params.waMessageId) {
+    const existing = await query(
+      `SELECT id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, created_at
+       FROM whatsapp_message WHERE wa_message_id = $1`,
+      [params.waMessageId]
+    )
+    return existing.rows[0]
+  }
+
+  throw new Error('Failed to insert WhatsApp message')
+}
+
+export async function getWhatsAppMessages(phone: string): Promise<WhatsAppMessageRow[]> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, created_at
+     FROM whatsapp_message
+     WHERE phone = $1
+     ORDER BY wa_timestamp ASC`,
+    [phone]
+  )
+  return result.rows
+}
+
+export async function markWhatsAppRead(phone: string): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(
+    `INSERT INTO whatsapp_read_state (phone, last_read_at)
+     VALUES ($1, CURRENT_TIMESTAMP)
+     ON CONFLICT (phone) DO UPDATE SET last_read_at = CURRENT_TIMESTAMP`,
+    [phone]
+  )
+}
+
+export async function getUnreadWhatsAppPhones(): Promise<
+  { phone: string; unreadCount: number; lastMessageAt: Date; lastMessageBody: string }[]
+> {
+  await initializeLeadsDatabase()
+  const result = await query(`
+    SELECT
+      m.phone,
+      COUNT(*)::int AS unread_count,
+      MAX(m.wa_timestamp) AS last_message_at,
+      (
+        SELECT body FROM whatsapp_message m2
+        WHERE m2.phone = m.phone AND m2.direction = 'inbound'
+        ORDER BY m2.wa_timestamp DESC
+        LIMIT 1
+      ) AS last_message_body
+    FROM whatsapp_message m
+    LEFT JOIN whatsapp_read_state r ON r.phone = m.phone
+    WHERE m.direction = 'inbound'
+      AND (r.last_read_at IS NULL OR m.wa_timestamp > r.last_read_at)
+    GROUP BY m.phone
+    ORDER BY last_message_at DESC
+  `)
+  return result.rows.map((row) => ({
+    phone: row.phone,
+    unreadCount: row.unread_count,
+    lastMessageAt: row.last_message_at,
+    lastMessageBody: row.last_message_body,
+  }))
+}
+
 export default pool
 

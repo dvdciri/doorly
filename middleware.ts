@@ -1,31 +1,47 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const COOKIE_NAME = 'analysis-auth'
+const COOKIE_NAME = 'backoffice-auth'
 const COOKIE_SECRET = process.env.ANALYSIS_COOKIE_SECRET
+
+function isAuthenticated(request: NextRequest): boolean {
+  const authCookie = request.cookies.get(COOKIE_NAME)
+  return Boolean(authCookie && authCookie.value === COOKIE_SECRET)
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Only protect /analysis routes, but allow /analysis/login
-  if (pathname.startsWith('/analysis') && !pathname.startsWith('/analysis/login')) {
-    const authCookie = request.cookies.get(COOKIE_NAME)
-    
-    // Check if user is authenticated
-    if (!authCookie || authCookie.value !== COOKIE_SECRET) {
-      // Redirect to login page
-      const loginUrl = new URL('/analysis/login', request.url)
-      // Preserve the original URL as a query parameter for redirect after login
+  // Redirect legacy /analysis routes to /backoffice
+  if (pathname === '/analysis' || pathname.startsWith('/analysis/')) {
+    const newPath = pathname.replace(/^\/analysis/, '/backoffice')
+    const redirectUrl = new URL(newPath, request.url)
+    redirectUrl.search = request.nextUrl.search
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  // Protect /backoffice pages except login
+  if (pathname.startsWith('/backoffice') && !pathname.startsWith('/backoffice/login')) {
+    if (!isAuthenticated(request)) {
+      const loginUrl = new URL('/backoffice/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       return NextResponse.redirect(loginUrl)
     }
   }
 
-  // If accessing login page while already authenticated, redirect to /analysis
-  if (pathname === '/analysis/login') {
-    const authCookie = request.cookies.get(COOKIE_NAME)
-    if (authCookie && authCookie.value === COOKIE_SECRET) {
-      return NextResponse.redirect(new URL('/analysis', request.url))
+  // Redirect authenticated users away from login
+  if (pathname === '/backoffice/login' && isAuthenticated(request)) {
+    return NextResponse.redirect(new URL('/backoffice', request.url))
+  }
+
+  // Protect /api/backoffice routes except login/logout
+  if (
+    pathname.startsWith('/api/backoffice') &&
+    !pathname.startsWith('/api/backoffice/login') &&
+    !pathname.startsWith('/api/backoffice/logout')
+  ) {
+    if (!isAuthenticated(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
 
@@ -33,5 +49,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/analysis/:path*',
+  matcher: ['/backoffice/:path*', '/analysis/:path*', '/api/backoffice/:path*'],
 }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { validateCredentials } from '@/lib/auth'
 
-const COOKIE_NAME = 'analysis-auth'
+const COOKIE_NAME = 'backoffice-auth'
 const COOKIE_SECRET = process.env.ANALYSIS_COOKIE_SECRET
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navigation from '../components/Navigation'
 import Footer from '../components/Footer'
-import { LogOut, Building2, ArrowRight, DollarSign, MapPin } from 'lucide-react'
+import { LogOut, Building2, ArrowRight, DollarSign, MapPin, Users } from 'lucide-react'
 
 interface Tool {
   id: string
@@ -16,17 +16,25 @@ interface Tool {
   status?: 'active' | 'coming-soon'
 }
 
-export default function AnalysisDashboard() {
+export default function BackofficeDashboard() {
   const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const tools: Tool[] = [
     {
+      id: 'leads',
+      title: 'Property Leads Pipeline',
+      description: 'Manage property leads, pipeline stages, WhatsApp conversations, and Notion comments',
+      icon: <Users className="w-8 h-8" />,
+      href: '/backoffice/leads',
+      status: 'active',
+    },
+    {
       id: 'land-registry',
       title: 'Land Registry Query',
       description: 'Query UK Land Registry house price data by region, property type, and time period',
       icon: <Building2 className="w-8 h-8" />,
-      href: '/analysis/land-registry',
+      href: '/backoffice/land-registry',
       status: 'active',
     },
     {
@@ -34,7 +42,7 @@ export default function AnalysisDashboard() {
       title: 'ONS Salary Data',
       description: 'Query UK salary and earnings data by local authority from the Office for National Statistics',
       icon: <DollarSign className="w-8 h-8" />,
-      href: '/analysis/ons-salary',
+      href: '/backoffice/ons-salary',
       status: 'active',
     },
     {
@@ -42,7 +50,7 @@ export default function AnalysisDashboard() {
       title: 'Portfolio Address Analysis',
       description: 'Analyze rough addresses to find full addresses, property types, and EPC ratings',
       icon: <MapPin className="w-8 h-8" />,
-      href: '/analysis/portfolio-address',
+      href: '/backoffice/portfolio-address',
       status: 'active',
     },
   ]
@@ -50,11 +58,11 @@ export default function AnalysisDashboard() {
   const handleLogout = async () => {
     setIsLoggingOut(true)
     try {
-      const response = await fetch('/api/analysis/logout', {
+      const response = await fetch('/api/backoffice/logout', {
         method: 'POST',
       })
       if (response.ok) {
-        router.push('/analysis/login')
+        router.push('/backoffice/login')
       }
     } catch (error) {
       console.error('Logout error:', error)
@@ -67,7 +75,6 @@ export default function AnalysisDashboard() {
     <div className="min-h-screen bg-navy-gradient px-4 md:px-0">
       <Navigation />
       
-      {/* Header Section */}
       <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-8 md:pb-12">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-8 md:mb-12">
@@ -83,11 +90,11 @@ export default function AnalysisDashboard() {
               </button>
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-50 mb-4 md:mb-6 leading-tight px-2">
-              Market{' '}
-              <span className="text-accent-red">Analysis Portal</span>
+              Doorly{' '}
+              <span className="text-accent-red">Back Office</span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed px-2">
-              Internal market analysis and insights platform
+              Internal tools and operations
             </p>
             <div className="flex justify-center mt-6 md:mt-8">
               <div className="h-1 w-16 sm:w-20 bg-accent-red"></div>
@@ -96,7 +103,6 @@ export default function AnalysisDashboard() {
         </div>
       </section>
 
-      {/* Tools Grid */}
       <section className="px-4 sm:px-6 lg:px-8 pt-8 md:pt-12 pb-12 md:pb-20">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-2xl font-bold text-gray-50 mb-8">Available Tools</h2>
@@ -137,12 +143,6 @@ export default function AnalysisDashboard() {
               </Link>
             ))}
           </div>
-
-          {tools.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-400 text-lg">No tools available yet</p>
-            </div>
-          )}
         </div>
       </section>
 

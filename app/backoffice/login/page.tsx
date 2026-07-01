@@ -25,7 +25,7 @@ function LoginForm() {
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('/api/analysis/login', {
+      const response = await fetch('/api/backoffice/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ function LoginForm() {
       }
 
       // Success - redirect to analysis page or the redirect URL
-      const redirectTo = searchParams.get('redirect') || '/analysis'
+      const redirectTo = searchParams.get('redirect') || '/backoffice'
       router.push(redirectTo)
     } catch (err) {
       console.error('Login error:', err)
@@ -63,11 +63,11 @@ function LoginForm() {
               </div>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-50 mb-3 sm:mb-4 leading-tight">
-              Market Analysis{' '}
-              <span className="text-accent-red">Portal</span>
+              Doorly{' '}
+              <span className="text-accent-red">Back Office</span>
             </h1>
             <p className="text-base sm:text-lg text-gray-300 leading-relaxed">
-              Sign in to access the internal portal
+              Sign in to access internal tools
             </p>
             <div className="flex justify-center mt-4 md:mt-6">
               <div className="h-1 w-16 sm:w-20 bg-accent-red"></div>
@@ -167,11 +167,11 @@ export default function LoginPage() {
                 </div>
               </div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-50 mb-3 sm:mb-4 leading-tight">
-                Market Analysis{' '}
-                <span className="text-accent-red">Portal</span>
+                Doorly{' '}
+                <span className="text-accent-red">Back Office</span>
               </h1>
               <p className="text-base sm:text-lg text-gray-300 leading-relaxed">
-                Sign in to access the internal portal
+                Sign in to access internal tools
               </p>
               <div className="flex justify-center mt-4 md:mt-6">
                 <div className="h-1 w-16 sm:w-20 bg-accent-red"></div>

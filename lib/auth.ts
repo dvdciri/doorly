@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 
-const COOKIE_NAME = 'analysis-auth'
+const COOKIE_NAME = 'backoffice-auth'
 const COOKIE_SECRET = process.env.ANALYSIS_COOKIE_SECRET
 
 /**

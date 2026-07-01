@@ -37,11 +37,11 @@ export default function OnsSalaryPage() {
   const handleLogout = async () => {
     setIsLoggingOut(true)
     try {
-      const response = await fetch('/api/analysis/logout', {
+      const response = await fetch('/api/backoffice/logout', {
         method: 'POST',
       })
       if (response.ok) {
-        router.push('/analysis/login')
+        router.push('/backoffice/login')
       }
     } catch (error) {
       console.error('Logout error:', error)
@@ -58,7 +58,7 @@ export default function OnsSalaryPage() {
     setMessage(null)
 
     try {
-      const response = await fetch('/api/analysis/ons-salary', {
+      const response = await fetch('/api/backoffice/ons-salary', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +107,7 @@ export default function OnsSalaryPage() {
           <div className="text-center mb-8 md:mb-12">
             <div className="flex justify-between items-center mb-4">
               <Link
-                href="/analysis"
+                href="/backoffice"
                 className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-accent-red transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
