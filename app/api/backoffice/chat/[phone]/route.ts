@@ -4,7 +4,7 @@ import {
   getWhatsAppMessages,
   insertWhatsAppMessage,
 } from '@/lib/db'
-import { sendTextMessage } from '@/lib/whatsapp'
+import { sendTextMessage, formatWhatsAppError, logWhatsApp, logWhatsAppError } from '@/lib/whatsapp'
 import { normalizeUKPhone } from '@/lib/phone'
 
 export const dynamic = 'force-dynamic'
@@ -49,6 +49,7 @@ export async function GET(
         statusAt: message.status_at
           ? new Date(message.status_at).toISOString()
           : null,
+        statusError: message.status_error,
         messageType: message.message_type || 'text',
         mediaMimeType: message.media_mime_type,
         hasMedia: Boolean(message.media_blob_pathname || message.wa_media_id),
@@ -83,18 +84,83 @@ export async function POST(
       )
     }
 
-    const { messageId } = await sendTextMessage(phone, message.trim())
-
-    await insertWhatsAppMessage({
-      waMessageId: messageId,
+    const trimmedMessage = message.trim()
+    logWhatsApp('backoffice send attempt', {
       phone,
-      direction: 'outbound',
-      body: message.trim(),
       notionPageId: notionPageId || null,
-      status: 'sent',
+      bodyLength: trimmedMessage.length,
     })
 
-    return NextResponse.json({ success: true, messageId })
+    try {
+      const { messageId } = await sendTextMessage(phone, trimmedMessage)
+
+      const storedMessage = await insertWhatsAppMessage({
+        waMessageId: messageId,
+        phone,
+        direction: 'outbound',
+        body: trimmedMessage,
+        notionPageId: notionPageId || null,
+        status: 'sent',
+      })
+
+      logWhatsApp('backoffice send stored as sent', {
+        phone,
+        messageId,
+        dbMessageId: storedMessage.id,
+      })
+
+      return NextResponse.json({
+        success: true,
+        messageId,
+        message: {
+          id: storedMessage.id,
+          direction: storedMessage.direction,
+          body: storedMessage.body,
+          timestamp: new Date(storedMessage.wa_timestamp).toISOString(),
+          status: storedMessage.status,
+          statusError: storedMessage.status_error,
+        },
+      })
+    } catch (error) {
+      const statusError = formatWhatsAppError(error)
+      logWhatsAppError('backoffice send failed', {
+        phone,
+        notionPageId: notionPageId || null,
+        statusError,
+        error,
+      })
+
+      const storedMessage = await insertWhatsAppMessage({
+        phone,
+        direction: 'outbound',
+        body: trimmedMessage,
+        notionPageId: notionPageId || null,
+        status: 'failed',
+        statusError,
+      })
+
+      logWhatsAppError('backoffice send stored as failed', {
+        phone,
+        dbMessageId: storedMessage.id,
+        statusError: storedMessage.status_error,
+      })
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: statusError,
+          message: {
+            id: storedMessage.id,
+            direction: storedMessage.direction,
+            body: storedMessage.body,
+            timestamp: new Date(storedMessage.wa_timestamp).toISOString(),
+            status: storedMessage.status,
+            statusError: storedMessage.status_error,
+          },
+        },
+        { status: 502 }
+      )
+    }
   } catch (error: any) {
     console.error('Error sending chat message:', error)
     return NextResponse.json(

@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import {
   insertWhatsAppMessage,
   updateWhatsAppMessageStatus,
   upsertWhatsAppContact,
 } from '@/lib/db'
 import type { WhatsAppMessageType } from '@/lib/db'
-import { fromWhatsAppPhone, verifyWebhookToken } from '@/lib/whatsapp'
+import { fromWhatsAppPhone, verifyWebhookToken, formatWebhookStatusFailure, logWhatsApp, logWhatsAppError } from '@/lib/whatsapp'
 import { cacheWhatsAppMediaToBlob, mediaBodyLabel } from '@/lib/whatsapp-media'
+import {
+  isWhatsAppAgentEnabled,
+  processDebouncedAgentRun,
+  scheduleInboundAgentIfEligible,
+} from '@/lib/whatsapp-agent'
 
 function buildContactNameMap(contacts: any[]): Map<string, string> {
   const map = new Map<string, string>()
@@ -134,6 +140,13 @@ export async function POST(request: Request) {
             waMediaId: parsed.mediaId || null,
             mediaBlobPathname,
           })
+
+          if (parsed.messageType === 'text' && isWhatsAppAgentEnabled()) {
+            const generation = await scheduleInboundAgentIfEligible(phone)
+            if (generation !== null) {
+              waitUntil(processDebouncedAgentRun(phone, generation))
+            }
+          }
         }
 
         for (const status of value.statuses || []) {
@@ -142,7 +155,30 @@ export async function POST(request: Request) {
           }
 
           const statusAt = Number(status.timestamp)
-          await updateWhatsAppMessageStatus(status.id, status.status, statusAt)
+          const statusError = formatWebhookStatusFailure(status)
+
+          if (status.status === 'failed') {
+            logWhatsAppError('webhook delivery failed', {
+              waMessageId: status.id,
+              recipientId: status.recipient_id,
+              statusError,
+              errors: status.errors,
+              rawStatus: status,
+            })
+          } else {
+            logWhatsApp('webhook status update', {
+              waMessageId: status.id,
+              status: status.status,
+              recipientId: status.recipient_id,
+            })
+          }
+
+          await updateWhatsAppMessageStatus(
+            status.id,
+            status.status,
+            statusAt,
+            statusError
+          )
         }
       }
     }

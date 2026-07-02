@@ -249,6 +249,7 @@ export interface WhatsAppMessageRow {
   notion_page_id: string | null
   status: string | null
   status_at: Date | null
+  status_error: string | null
   created_at: Date
   message_type: WhatsAppMessageType
   media_mime_type: string | null
@@ -264,7 +265,7 @@ export interface WhatsAppContactRow {
 
 export type WhatsAppMessageStatus = 'sent' | 'delivered' | 'read' | 'failed'
 
-const MESSAGE_SELECT = `id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, status, status_at, created_at, message_type, media_mime_type, wa_media_id, media_blob_pathname`
+const MESSAGE_SELECT = `id, wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, status, status_at, status_error, created_at, message_type, media_mime_type, wa_media_id, media_blob_pathname`
 
 let leadsDbInitPromise: Promise<void> | null = null
 
@@ -320,6 +321,9 @@ export async function initializeLeadsDatabase() {
       `)
       await query(`
         ALTER TABLE whatsapp_message ADD COLUMN IF NOT EXISTS media_blob_pathname TEXT;
+      `)
+      await query(`
+        ALTER TABLE whatsapp_message ADD COLUMN IF NOT EXISTS status_error TEXT;
       `)
 
       await query(`
@@ -411,6 +415,20 @@ export async function initializeLeadsDatabase() {
           updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
       `)
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS whatsapp_agent_state (
+          phone TEXT PRIMARY KEY,
+          notion_page_id TEXT NOT NULL,
+          generation INT NOT NULL DEFAULT 0,
+          process_after TIMESTAMPTZ NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active'
+            CHECK (status IN ('active', 'completed')),
+          completed_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+      `)
     } catch (error: any) {
       leadsDbInitPromise = null
       console.error('Error initializing leads database:', error)
@@ -430,6 +448,7 @@ export async function insertWhatsAppMessage(params: {
   notionPageId?: string | null
   status?: WhatsAppMessageStatus | null
   statusAt?: Date | number | null
+  statusError?: string | null
   messageType?: WhatsAppMessageType
   mediaMimeType?: string | null
   waMediaId?: string | null
@@ -446,7 +465,7 @@ export async function insertWhatsAppMessage(params: {
 
   const result = await query(
     `INSERT INTO whatsapp_message (
-       wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, status, status_at,
+       wa_message_id, phone, direction, body, wa_timestamp, notion_page_id, status, status_at, status_error,
        message_type, media_mime_type, wa_media_id, media_blob_pathname
      )
      VALUES (
@@ -454,7 +473,7 @@ export async function insertWhatsAppMessage(params: {
        COALESCE(to_timestamp($5::double precision), NOW()),
        $6, $7,
        CASE WHEN $8::double precision IS NULL THEN NULL ELSE to_timestamp($8::double precision) END,
-       $9, $10, $11, $12
+       $9, $10, $11, $12, $13
      )
      ON CONFLICT (wa_message_id) DO NOTHING
      RETURNING ${MESSAGE_SELECT}`,
@@ -467,6 +486,7 @@ export async function insertWhatsAppMessage(params: {
       params.notionPageId || null,
       params.status || null,
       statusAtSeconds,
+      params.statusError || null,
       params.messageType || 'text',
       params.mediaMimeType || null,
       params.waMediaId || null,
@@ -523,7 +543,8 @@ const STATUS_RANK: Record<string, number> = {
 export async function updateWhatsAppMessageStatus(
   waMessageId: string,
   status: string,
-  statusAt: Date | number
+  statusAt: Date | number,
+  statusError?: string | null
 ): Promise<void> {
   await initializeLeadsDatabase()
 
@@ -535,6 +556,11 @@ export async function updateWhatsAppMessageStatus(
   )
 
   if (existing.rows.length === 0) {
+    console.warn('[WhatsApp] status update for unknown message', {
+      waMessageId,
+      status,
+      statusError: statusError ?? null,
+    })
     return
   }
 
@@ -546,21 +572,32 @@ export async function updateWhatsAppMessageStatus(
     return
   }
 
+  if (status === 'failed') {
+    console.error('[WhatsApp] updating message to failed', {
+      waMessageId,
+      previousStatus: currentStatus,
+      statusError: statusError ?? null,
+    })
+  }
+
   if (status === 'sent') {
     await query(
       `UPDATE whatsapp_message
        SET status = $1,
            status_at = to_timestamp($2::double precision),
-           wa_timestamp = to_timestamp($2::double precision)
+           wa_timestamp = to_timestamp($2::double precision),
+           status_error = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE status_error END
        WHERE wa_message_id = $3`,
-      [status, statusAtSeconds, waMessageId]
+      [status, statusAtSeconds, waMessageId, statusError ?? null]
     )
   } else {
     await query(
       `UPDATE whatsapp_message
-       SET status = $1, status_at = to_timestamp($2::double precision)
+       SET status = $1,
+           status_at = to_timestamp($2::double precision),
+           status_error = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE status_error END
        WHERE wa_message_id = $3`,
-      [status, statusAtSeconds, waMessageId]
+      [status, statusAtSeconds, waMessageId, statusError ?? null]
     )
   }
 }
@@ -685,6 +722,7 @@ export async function deleteWhatsAppDataForPhone(phone: string): Promise<void> {
   await query(`DELETE FROM whatsapp_message WHERE phone = $1`, [phone])
   await query(`DELETE FROM whatsapp_read_state WHERE phone = $1`, [phone])
   await query(`DELETE FROM whatsapp_contact WHERE phone = $1`, [phone])
+  await query(`DELETE FROM whatsapp_agent_state WHERE phone = $1`, [phone])
 }
 
 export type WelcomeMessageJobStatus = 'pending' | 'sent' | 'skipped' | 'failed'
@@ -762,6 +800,125 @@ export async function getWelcomeMessageJobByNotionPageId(
     [notionPageId]
   )
   return result.rows[0] ? mapWelcomeMessageJobRow(result.rows[0]) : null
+}
+
+export async function getWelcomeMessageJobByPhone(
+  phone: string
+): Promise<WelcomeMessageJobRow | null> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT ${WELCOME_JOB_SELECT}
+     FROM welcome_message_job
+     WHERE phone = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [phone]
+  )
+  return result.rows[0] ? mapWelcomeMessageJobRow(result.rows[0]) : null
+}
+
+export async function getLatestNotionPageIdForPhone(
+  phone: string
+): Promise<string | null> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT notion_page_id
+     FROM whatsapp_message
+     WHERE phone = $1
+       AND notion_page_id IS NOT NULL
+       AND direction = 'outbound'
+     ORDER BY wa_timestamp DESC, id DESC
+     LIMIT 1`,
+    [phone]
+  )
+  return result.rows[0]?.notion_page_id || null
+}
+
+export type WhatsAppAgentStatus = 'active' | 'completed'
+
+export interface WhatsAppAgentStateRow {
+  phone: string
+  notion_page_id: string
+  generation: number
+  process_after: Date
+  status: WhatsAppAgentStatus
+  completed_at: Date | null
+  created_at: Date
+  updated_at: Date
+}
+
+const AGENT_STATE_SELECT = `phone, notion_page_id, generation, process_after, status, completed_at, created_at, updated_at`
+
+function mapWhatsAppAgentStateRow(row: any): WhatsAppAgentStateRow {
+  return {
+    phone: row.phone,
+    notion_page_id: row.notion_page_id,
+    generation: row.generation,
+    process_after: row.process_after,
+    status: row.status,
+    completed_at: row.completed_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }
+}
+
+export async function getWhatsAppAgentState(
+  phone: string
+): Promise<WhatsAppAgentStateRow | null> {
+  await initializeLeadsDatabase()
+  const result = await query(
+    `SELECT ${AGENT_STATE_SELECT}
+     FROM whatsapp_agent_state
+     WHERE phone = $1`,
+    [phone]
+  )
+  return result.rows[0] ? mapWhatsAppAgentStateRow(result.rows[0]) : null
+}
+
+export async function scheduleAgentRun(
+  phone: string,
+  notionPageId: string,
+  debounceSeconds: number
+): Promise<{ generation: number } | null> {
+  await initializeLeadsDatabase()
+
+  const existing = await getWhatsAppAgentState(phone)
+  if (existing?.status === 'completed') {
+    return null
+  }
+
+  const result = await query(
+    `INSERT INTO whatsapp_agent_state (
+       phone, notion_page_id, generation, process_after, status
+     )
+     VALUES ($1, $2, 1, NOW() + make_interval(secs => $3), 'active')
+     ON CONFLICT (phone) DO UPDATE SET
+       notion_page_id = EXCLUDED.notion_page_id,
+       generation = whatsapp_agent_state.generation + 1,
+       process_after = NOW() + make_interval(secs => $3),
+       updated_at = CURRENT_TIMESTAMP
+     WHERE whatsapp_agent_state.status = 'active'
+     RETURNING generation`,
+    [phone, notionPageId, debounceSeconds]
+  )
+
+  if (!result.rows[0]) {
+    return null
+  }
+
+  return { generation: result.rows[0].generation }
+}
+
+export async function markAgentCompleted(phone: string): Promise<void> {
+  await initializeLeadsDatabase()
+  await query(
+    `UPDATE whatsapp_agent_state
+     SET status = 'completed',
+         completed_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE phone = $1`,
+    [phone]
+  )
 }
 
 export async function resetWelcomeMessageJobForRetry(

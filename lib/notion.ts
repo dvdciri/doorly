@@ -10,6 +10,7 @@ export interface Lead {
   addedDate: string | null
   propertyCount: string | null
   extraInformation: string | null
+  propertyAddress: string | null
   url: string
 }
 
@@ -74,6 +75,7 @@ export function parseLeadFromPage(page: any): Lead {
     addedDate: extractDate(properties['Added date']),
     propertyCount: extractRichText(properties['Number of properties']),
     extraInformation: extractRichText(properties['Extra information']),
+    propertyAddress: extractRichText(properties['Property address']),
     url: page.url || `https://notion.so/${page.id.replace(/-/g, '')}`,
   }
 }
@@ -132,6 +134,25 @@ export async function updateLeadExtraInformation(
     body: JSON.stringify({
       properties: {
         'Extra information': {
+          rich_text: [{ text: { content: text } }],
+        },
+      },
+    }),
+  })
+}
+
+/**
+ * Update the Property address column on a lead page
+ */
+export async function updateLeadPropertyAddress(
+  pageId: string,
+  text: string
+): Promise<void> {
+  await notionFetch(`/pages/${pageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      properties: {
+        'Property address': {
           rich_text: [{ text: { content: text } }],
         },
       },

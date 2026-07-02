@@ -1,6 +1,73 @@
 import { normalizeUKPhone } from '@/lib/phone'
 
 const WHATSAPP_API_BASE = 'https://graph.facebook.com/v21.0'
+const WHATSAPP_LOG_PREFIX = '[WhatsApp]'
+
+export function logWhatsApp(
+  event: string,
+  details?: Record<string, unknown>
+): void {
+  if (details) {
+    console.log(`${WHATSAPP_LOG_PREFIX} ${event}`, details)
+  } else {
+    console.log(`${WHATSAPP_LOG_PREFIX} ${event}`)
+  }
+}
+
+export function logWhatsAppError(
+  event: string,
+  details?: Record<string, unknown>
+): void {
+  if (details) {
+    console.error(`${WHATSAPP_LOG_PREFIX} ${event}`, details)
+  } else {
+    console.error(`${WHATSAPP_LOG_PREFIX} ${event}`)
+  }
+}
+
+function truncateForStorage(value: string, maxLength = 1000): string {
+  if (value.length <= maxLength) {
+    return value
+  }
+  return `${value.slice(0, maxLength - 3)}...`
+}
+
+export function parseWhatsAppApiError(
+  responseText: string,
+  statusCode: number
+): string {
+  try {
+    const parsed = JSON.parse(responseText) as {
+      error?: {
+        code?: number
+        message?: string
+        type?: string
+        error_user_msg?: string
+        error_user_title?: string
+        error_data?: { details?: string }
+      }
+    }
+    const err = parsed.error
+    if (err) {
+      const parts = [
+        err.code ? `[${err.code}]` : null,
+        err.error_user_title,
+        err.error_user_msg || err.message,
+        err.type ? `(${err.type})` : null,
+        err.error_data?.details,
+      ].filter(Boolean)
+      if (parts.length > 0) {
+        return parts.join(' ')
+      }
+    }
+  } catch {
+    // Fall through to raw response text.
+  }
+
+  return truncateForStorage(
+    `WhatsApp API error: ${statusCode} - ${responseText || 'empty response body'}`
+  )
+}
 
 function getPhoneNumberId(): string {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
@@ -55,6 +122,13 @@ export async function sendTextMessage(toPhone: string, body: string): Promise<{
   }
 
   const phoneNumberId = getPhoneNumberId()
+  logWhatsApp('sendTextMessage request', {
+    toPhone,
+    waPhone,
+    bodyLength: body.length,
+    phoneNumberId,
+  })
+
   const response = await fetch(`${WHATSAPP_API_BASE}/${phoneNumberId}/messages`, {
     method: 'POST',
     headers: {
@@ -69,18 +143,109 @@ export async function sendTextMessage(toPhone: string, body: string): Promise<{
     }),
   })
 
+  const responseText = await response.text()
+
   if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`WhatsApp API error: ${response.status} - ${errorText}`)
+    const statusError = parseWhatsAppApiError(responseText, response.status)
+    logWhatsAppError('sendTextMessage failed', {
+      toPhone,
+      waPhone,
+      httpStatus: response.status,
+      statusError,
+      responseBody: responseText,
+    })
+    throw new Error(statusError)
   }
 
-  const data = await response.json()
+  let data: { messages?: Array<{ id?: string }> }
+  try {
+    data = JSON.parse(responseText)
+  } catch {
+    logWhatsAppError('sendTextMessage invalid JSON response', {
+      toPhone,
+      waPhone,
+      responseBody: responseText,
+    })
+    throw new Error('WhatsApp API returned invalid JSON')
+  }
+
   const messageId = data.messages?.[0]?.id
   if (!messageId) {
+    logWhatsAppError('sendTextMessage missing message id', {
+      toPhone,
+      waPhone,
+      responseBody: responseText,
+    })
     throw new Error('WhatsApp API did not return a message ID')
   }
 
+  logWhatsApp('sendTextMessage succeeded', {
+    toPhone,
+    waPhone,
+    messageId,
+  })
+
   return { messageId }
+}
+
+export function formatWhatsAppError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+  return 'Failed to send message'
+}
+
+export function formatWebhookStatusErrors(errors: unknown): string | null {
+  if (!Array.isArray(errors) || errors.length === 0) {
+    return null
+  }
+
+  const formatted = errors
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null
+      }
+      const error = entry as {
+        code?: number
+        title?: string
+        message?: string
+        error_data?: { details?: string }
+      }
+      const parts = [
+        error.code ? `[${error.code}]` : null,
+        error.title,
+        error.message,
+        error.error_data?.details,
+      ].filter(Boolean)
+      return parts.join(' ')
+    })
+    .filter(Boolean)
+
+  return formatted.length > 0 ? formatted.join('; ') : null
+}
+
+export function formatWebhookStatusFailure(status: {
+  status?: string
+  errors?: unknown
+  id?: string
+  recipient_id?: string
+}): string | null {
+  const fromErrors = formatWebhookStatusErrors(status.errors)
+  if (fromErrors) {
+    return fromErrors
+  }
+
+  if (status.status !== 'failed') {
+    return null
+  }
+
+  try {
+    return truncateForStorage(
+      `Delivery failed (no structured error from Meta). Raw status: ${JSON.stringify(status)}`
+    )
+  } catch {
+    return 'Delivery failed (no structured error from Meta)'
+  }
 }
 
 export type WhatsAppTemplateMessageOptions = {

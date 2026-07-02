@@ -65,6 +65,7 @@ interface ChatMessage {
   timestamp: string
   status?: string | null
   statusAt?: string | null
+  statusError?: string | null
   messageType?: 'text' | 'image' | 'video' | 'audio'
   mediaMimeType?: string | null
   hasMedia?: boolean
@@ -272,7 +273,15 @@ function ChatMessageContent({ msg }: { msg: ChatMessage }) {
   return <p className="whitespace-pre-wrap">{msg.body}</p>
 }
 
-function MessageStatusReceipt({ status }: { status?: string | null }) {
+function MessageStatusReceipt({
+  status,
+  statusError,
+}: {
+  status?: string | null
+  statusError?: string | null
+}) {
+  const [showError, setShowError] = useState(false)
+
   if (!status) return null
 
   if (status === 'read') {
@@ -297,9 +306,30 @@ function MessageStatusReceipt({ status }: { status?: string | null }) {
     )
   }
   if (status === 'failed') {
+    const errorText =
+      statusError ||
+      'No error details stored. Check the server terminal for logs prefixed with [WhatsApp].'
     return (
-      <span className="inline-flex items-center gap-0.5 text-red-300" title="Failed to send">
-        <AlertCircle className="w-3.5 h-3.5" />
+      <span className="relative inline-flex items-center">
+        <button
+          type="button"
+          onClick={() => setShowError((open) => !open)}
+          className="inline-flex items-center gap-0.5 text-red-300 hover:text-red-200 transition-colors"
+          title="Click to view failure reason"
+          aria-label="View send failure reason"
+          aria-expanded={showError}
+        >
+          <AlertCircle className="w-3.5 h-3.5" />
+        </button>
+        {showError && (
+          <div
+            role="tooltip"
+            className="absolute bottom-full right-0 z-20 mb-2 w-64 max-w-[70vw] rounded-lg border border-red-500/30 bg-navy-900 px-3 py-2 text-left text-xs text-red-100 shadow-lg"
+          >
+            <p className="font-medium text-red-300 mb-1">Send failed</p>
+            <p className="whitespace-pre-wrap break-words">{errorText}</p>
+          </div>
+        )}
       </span>
     )
   }
@@ -676,9 +706,13 @@ export default function LeadsPipelinePage() {
           }),
         }
       )
+      const data = await response.json()
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to send message')
+        setNewMessage('')
+        scrollSmoothOnNextRef.current = true
+        await fetchChat(selectedLead.phone)
+        console.error(data.error || 'Failed to send message')
+        return
       }
       setNewMessage('')
       scrollSmoothOnNextRef.current = true
@@ -1109,7 +1143,10 @@ export default function LeadsPipelinePage() {
                                           {formatUKDateTime(msg.timestamp)}
                                         </span>
                                         {msg.direction === 'outbound' && (
-                                          <MessageStatusReceipt status={msg.status} />
+                                          <MessageStatusReceipt
+                                            status={msg.status}
+                                            statusError={msg.statusError}
+                                          />
                                         )}
                                       </div>
                                     </div>
