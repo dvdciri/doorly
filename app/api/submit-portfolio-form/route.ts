@@ -4,10 +4,6 @@ import { sendPortfolioSubmissionEmail } from '@/lib/email'
 import { sendLeadEvent } from '@/lib/facebook-conversions'
 import { sendPortfolioLeadToNotion } from '@/lib/notion'
 import { validateUKPhone, normalizeUKPhone } from '@/lib/phone'
-import {
-  isWelcomeMessageEnabled,
-  sendWelcomeMessageForLead,
-} from '@/lib/welcome-message'
 
 export async function POST(request: Request) {
   try {
@@ -99,22 +95,6 @@ export async function POST(request: Request) {
     } catch (notionError: any) {
       // Log error but don't fail the form submission
       console.error('Notion API failed, but form submission succeeded:', notionError.message || notionError)
-    }
-
-    if (notionPageId && isWelcomeMessageEnabled()) {
-      try {
-        await sendWelcomeMessageForLead({
-          notionPageId,
-          phone: sanitizedPhone,
-          leadName: sanitizedName,
-          propertyCount: sanitizedPropertyCount,
-        })
-      } catch (welcomeError: any) {
-        console.error(
-          'Failed to send welcome message, but form submission succeeded:',
-          welcomeError.message || welcomeError
-        )
-      }
     }
 
     return NextResponse.json(

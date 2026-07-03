@@ -11,11 +11,8 @@
     "init-db": "tsx scripts/init-db.ts"
   },
   "dependencies": {
-    "@openrouter/agent": "^0.7.2",
     "@types/pg": "^8.16.0",
     "@vercel/analytics": "^1.6.1",
-    "@vercel/blob": "^2.5.0",
-    "@vercel/functions": "^3.7.5",
     "bcryptjs": "^2.4.3",
     "lucide-react": "^0.562.0",
     "next": "^14.0.0",

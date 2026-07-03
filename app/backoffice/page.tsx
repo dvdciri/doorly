@@ -24,7 +24,7 @@ export default function BackofficeDashboard() {
     {
       id: 'leads',
       title: 'Property Leads Pipeline',
-      description: 'Manage property leads, pipeline stages, WhatsApp conversations, and Notion comments',
+      description: 'Manage property leads, pipeline stages, and Notion comments',
       icon: <Users className="w-8 h-8" />,
       href: '/backoffice/leads',
       status: 'active',

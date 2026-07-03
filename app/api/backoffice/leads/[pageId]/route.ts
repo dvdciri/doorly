@@ -6,16 +6,7 @@ import {
   getLeadsDatabase,
   updateLeadStage,
 } from '@/lib/notion'
-import {
-  deleteWhatsAppDataForPhone,
-  deleteWelcomeMessageJobForNotionPage,
-  getUnreadWhatsAppPhones,
-  getWelcomeMessageJobByNotionPageId,
-  getWhatsAppMediaPathnamesForPhone,
-} from '@/lib/db'
-import { deleteWhatsAppMediaBlobs } from '@/lib/blob'
 import { normalizeUKPhone } from '@/lib/phone'
-import { serializeWelcomeMessageJob } from '@/lib/welcome-message'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,10 +15,7 @@ export async function GET(
   { params }: { params: { pageId: string } }
 ) {
   try {
-    const [lead, unreadPhones] = await Promise.all([
-      getLead(params.pageId),
-      getUnreadWhatsAppPhones(),
-    ])
+    const lead = await getLead(params.pageId)
 
     let comments: Awaited<ReturnType<typeof getLeadComments>> = []
     let commentsError: string | null = null
@@ -42,22 +30,14 @@ export async function GET(
     }
 
     const normalizedPhone = lead.phone ? normalizeUKPhone(lead.phone) : null
-    const unread = normalizedPhone
-      ? unreadPhones.find((item) => item.phone === normalizedPhone)
-      : undefined
-    const welcomeMessageJob = await getWelcomeMessageJobByNotionPageId(params.pageId)
 
     return NextResponse.json({
       lead: {
         ...lead,
         phone: normalizedPhone || lead.phone,
-        unreadCount: unread?.unreadCount || 0,
       },
       comments,
       commentsError,
-      welcomeMessage: welcomeMessageJob
-        ? serializeWelcomeMessageJob(welcomeMessageJob)
-        : null,
     })
   } catch (error: any) {
     console.error('Error fetching lead:', error)
@@ -113,18 +93,7 @@ export async function DELETE(
   { params }: { params: { pageId: string } }
 ) {
   try {
-    const lead = await getLead(params.pageId)
-    const normalizedPhone = lead.phone ? normalizeUKPhone(lead.phone) : null
-
-    if (normalizedPhone) {
-      const pathnames = await getWhatsAppMediaPathnamesForPhone(normalizedPhone)
-      await deleteWhatsAppDataForPhone(normalizedPhone)
-      await deleteWhatsAppMediaBlobs(pathnames)
-    }
-
-    await deleteWelcomeMessageJobForNotionPage(params.pageId)
     await archiveLead(params.pageId)
-
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error deleting lead:', error)

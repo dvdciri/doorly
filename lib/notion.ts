@@ -142,25 +142,6 @@ export async function updateLeadExtraInformation(
 }
 
 /**
- * Update the Property address column on a lead page
- */
-export async function updateLeadPropertyAddress(
-  pageId: string,
-  text: string
-): Promise<void> {
-  await notionFetch(`/pages/${pageId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      properties: {
-        'Property address': {
-          rich_text: [{ text: { content: text } }],
-        },
-      },
-    }),
-  })
-}
-
-/**
  * Send portfolio form lead to Notion database
  * Returns the Notion page ID
  */
@@ -354,14 +335,6 @@ export async function updateLeadStage(pageId: string, stage: string): Promise<vo
       },
     }),
   })
-}
-
-/**
- * Check whether a lead page has been archived in Notion
- */
-export async function isLeadArchived(pageId: string): Promise<boolean> {
-  const page = await notionFetch(`/pages/${pageId}`)
-  return Boolean(page.archived)
 }
 
 /**
