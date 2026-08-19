@@ -15,6 +15,8 @@ export interface RentLogEntry {
   notes: string | null
   lastChecked: string | null
   flatRef: string | null
+  doorNumber: string | null
+  source: string | null
   url: string
 }
 
@@ -126,6 +128,18 @@ function extractNumber(property: any): number | null {
   return null
 }
 
+function extractRelationIds(property: any): string[] {
+  if (property?.type !== 'relation' || !Array.isArray(property.relation)) return []
+  return property.relation.map((item: any) => item.id).filter(Boolean)
+}
+
+/** "Flat A, 542" -> "542"; "32" -> "32"; "31b" -> "31b" */
+export function buildingDoorNumber(door: string | null): string | null {
+  if (!door?.trim()) return null
+  const stripped = door.replace(/^flat\s+[^,]+,\s*/i, '').trim()
+  return stripped || door.trim()
+}
+
 function asAmount(value: number | null): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
@@ -185,8 +199,9 @@ function propertyByName(properties: Record<string, any>, names: string[]): any {
   return null
 }
 
-export function parseRentLogPage(page: any): RentLogEntry {
+export function parseRentLogPage(page: any): RentLogEntry & { propertyRefId: string | null } {
   const properties = page.properties || {}
+  const relationIds = extractRelationIds(propertyByName(properties, ['Property Ref']))
 
   return {
     id: page.id,
@@ -203,8 +218,37 @@ export function parseRentLogPage(page: any): RentLogEntry {
     notes: extractText(propertyByName(properties, ['Notes'])),
     lastChecked: extractDate(propertyByName(properties, ['Last checked'])),
     flatRef: extractText(propertyByName(properties, ['Flat ref'])),
+    doorNumber: null,
+    source: extractText(propertyByName(properties, ['Source'])),
+    propertyRefId: relationIds[0] || null,
     url: page.url || `https://notion.so/${page.id.replace(/-/g, '')}`,
   }
+}
+
+async function resolveDoorNumbers(
+  entries: Array<RentLogEntry & { propertyRefId: string | null }>
+): Promise<RentLogEntry[]> {
+  const ids = [...new Set(entries.map((entry) => entry.propertyRefId).filter(Boolean))] as string[]
+  const doors = new Map<string, string | null>()
+
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const page = await notionFetch(`/pages/${id}`)
+        const properties = page.properties || {}
+        const rawDoor = extractText(propertyByName(properties, ['Door #']))
+        doors.set(id, buildingDoorNumber(rawDoor))
+      } catch (error) {
+        console.error('Failed to resolve property door number', id, error)
+        doors.set(id, null)
+      }
+    })
+  )
+
+  return entries.map(({ propertyRefId, ...entry }) => ({
+    ...entry,
+    doorNumber: propertyRefId ? buildingDoorNumber(doors.get(propertyRefId) || null) : null,
+  }))
 }
 
 export function missingAmountOf(entry: RentLogEntry): number {
@@ -305,7 +349,7 @@ export async function queryRentLog(month?: string, year?: string): Promise<RentL
   const resolvedMonth = matchOption(month || currentMonthName(), monthOptions.length ? monthOptions : [currentMonthName()])
   const resolvedYear = matchOption(year || currentYearName(), yearOptions.length ? yearOptions : [currentYearName()])
 
-  const entries: RentLogEntry[] = []
+  const rawEntries: Array<RentLogEntry & { propertyRefId: string | null }> = []
   let startCursor: string | undefined
   const filter = buildPeriodFilter(
     monthProperty ? { ...monthProperty, name: Object.keys(properties).find((k) => properties[k] === monthProperty) || 'Month' } : null,
@@ -330,11 +374,13 @@ export async function queryRentLog(month?: string, year?: string): Promise<RentL
     })
 
     for (const page of data.results || []) {
-      entries.push(parseRentLogPage(page))
+      rawEntries.push(parseRentLogPage(page))
     }
 
     startCursor = data.has_more ? data.next_cursor : undefined
   } while (startCursor)
+
+  const entries = await resolveDoorNumbers(rawEntries)
 
   entries.sort((a, b) => {
     const flatA = a.flatRef || ''

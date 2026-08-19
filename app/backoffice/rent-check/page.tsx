@@ -61,8 +61,10 @@ function matchesSearch(entry: RentLogEntry, query: string): boolean {
   const haystack = [
     entry.name,
     entry.propertyAddress,
+    entry.doorNumber,
     entry.notes,
     entry.flatRef,
+    entry.source,
     entry.status,
   ]
     .filter(Boolean)
@@ -81,30 +83,32 @@ function downloadCsv(entries: RentLogEntry[], month: string, year: string) {
   const headers = [
     'Name',
     'Property Address',
+    'Door',
     'Flat ref',
     'Status',
     'Expected',
-    'Gross Received',
-    'Net Received',
+    'Received Gross',
+    'Received Net',
     'Missing amount',
-    'Date received',
     'Last checked',
     'Notes',
+    'Source',
     'Notion URL',
   ]
   const rows = entries.map((entry) =>
     [
       entry.name,
       entry.propertyAddress,
+      entry.doorNumber,
       entry.flatRef,
       entry.status,
       entry.expected,
       entry.grossReceived,
       entry.netReceived,
       entry.missingAmount,
-      entry.dateReceived,
       entry.lastChecked,
       entry.notes,
+      entry.source,
       entry.url,
     ]
       .map(csvEscape)
@@ -133,6 +137,8 @@ interface GroupedRows {
 function blockKey(entry: RentLogEntry): string | null {
   if (!entry.flatRef?.trim()) return null
   const address = entry.propertyAddress?.trim()
+  const door = entry.doorNumber?.trim()
+  if (address && door) return `block:${address.toLowerCase()}|${door.toLowerCase()}`
   if (address) return `addr:${address.toLowerCase()}`
   const code = entry.name.match(/\b(P\d+)\b/i)?.[1]?.toUpperCase()
   if (code) return `code:${code}`
@@ -141,9 +147,18 @@ function blockKey(entry: RentLogEntry): string | null {
 
 function blockLabel(entry: RentLogEntry): string {
   const address = entry.propertyAddress?.trim()
+  const door = entry.doorNumber?.trim()
+  if (address && door) return `${door} ${address}`
   if (address) return address
   const code = entry.name.match(/\b(P\d+)\b/i)?.[1]?.toUpperCase()
   return code || entry.flatRef?.trim() || 'Block'
+}
+
+function displayAddress(entry: RentLogEntry): string {
+  const address = entry.propertyAddress?.trim()
+  const door = entry.doorNumber?.trim()
+  if (address && door) return `${door} ${address}`
+  return address || entry.name
 }
 
 function groupEntries(entries: RentLogEntry[]): GroupedRows[] {
@@ -255,7 +270,7 @@ export default function RentCheckPage() {
   const shortfallItems = useMemo(() => {
     return filteredEntries
       .map((entry) => ({
-        label: entry.propertyAddress || entry.name,
+        label: displayAddress(entry),
         outstanding: outstandingOf(entry),
       }))
       .filter((item) => item.outstanding > 0)
@@ -378,12 +393,12 @@ export default function RentCheckPage() {
                   hint={`${data.totals.propertyCount} ${data.totals.propertyCount === 1 ? 'property' : 'properties'}`}
                 />
                 <KpiCard
-                  label="Gross received"
+                  label="Received Gross"
                   value={formatGbp(data.totals.totalGrossReceived)}
                   hint={collectedPct ? `${collectedPct} of expected` : 'No expected rent set'}
                 />
                 <KpiCard
-                  label="Net received"
+                  label="Received Net"
                   value={formatGbp(data.totals.totalNetReceived)}
                   hint={netVsGross ? `${netVsGross} of gross` : 'No gross received yet'}
                 />
@@ -423,7 +438,7 @@ export default function RentCheckPage() {
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search name, address, notes, flat ref"
+                      placeholder="Search name, address, notes, source, flat ref"
                       className="w-full rounded-lg bg-navy-950 border border-white/10 pl-9 pr-3 py-2 text-sm text-gray-50 placeholder:text-gray-500"
                     />
                   </div>
@@ -468,12 +483,12 @@ export default function RentCheckPage() {
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Property</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Status</th>
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Expected</th>
-                          <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Gross</th>
-                          <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Net</th>
+                          <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Received Gross</th>
+                          <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Received Net</th>
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Missing</th>
-                          <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Received</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Last checked</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Notes</th>
+                          <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Source</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]" />
                         </tr>
                       </thead>
@@ -496,7 +511,19 @@ export default function RentCheckPage() {
   )
 }
 
-function NotesCell({ notes, title }: { notes: string | null; title: string }) {
+function NotesCell({
+  notes,
+  title,
+  heading = 'Notes',
+  emptyLabel = '—',
+  openLabel = 'View notes',
+}: {
+  notes: string | null
+  title: string
+  heading?: string
+  emptyLabel?: string
+  openLabel?: string
+}) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -513,7 +540,7 @@ function NotesCell({ notes, title }: { notes: string | null; title: string }) {
   }, [open])
 
   if (!notes) {
-    return <span className="text-gray-500">—</span>
+    return <span className="text-gray-500">{emptyLabel}</span>
   }
 
   return (
@@ -521,11 +548,9 @@ function NotesCell({ notes, title }: { notes: string | null; title: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full text-left text-gray-300 hover:text-white"
-        title="Open full note"
+        className="text-sm text-accent-red hover:text-accent-red/80 underline underline-offset-2 whitespace-nowrap"
       >
-        <span className="block truncate">{notes}</span>
-        <span className="text-[11px] text-accent-red/80">View full note</span>
+        {openLabel}
       </button>
       {open && (
         <div
@@ -541,7 +566,7 @@ function NotesCell({ notes, title }: { notes: string | null; title: string }) {
           >
             <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-400">Notes</p>
+                <p className="text-xs uppercase tracking-wide text-gray-400">{heading}</p>
                 <h3 id="rent-note-title" className="text-base font-semibold text-gray-50 mt-1">
                   {title}
                 </h3>
@@ -550,7 +575,7 @@ function NotesCell({ notes, title }: { notes: string | null; title: string }) {
                 type="button"
                 onClick={() => setOpen(false)}
                 className="text-gray-400 hover:text-white p-1"
-                aria-label="Close note"
+                aria-label={`Close ${heading.toLowerCase()}`}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -606,7 +631,7 @@ function GroupRows({ group }: { group: GroupedRows }) {
               </span>
             </span>
             <span className="text-xs text-gray-400">
-              Exp {formatGbp(group.expected)} · Gross {formatGbp(group.gross)} · Missing{' '}
+              Exp {formatGbp(group.expected)} · Rec. Gross {formatGbp(group.gross)} · Missing{' '}
               <span className={group.outstanding > 0 ? 'text-accent-red' : 'text-emerald-400'}>
                 {formatGbp(group.outstanding)}
               </span>
@@ -624,9 +649,9 @@ function GroupRows({ group }: { group: GroupedRows }) {
                 {nested && entry.flatRef ? (
                   <span className="text-gray-400 mr-2">{entry.flatRef}</span>
                 ) : null}
-                {entry.propertyAddress || entry.name}
+                {displayAddress(entry)}
               </div>
-              {entry.propertyAddress && entry.name !== entry.propertyAddress && (
+              {entry.name && entry.name !== displayAddress(entry) && (
                 <div className="text-xs text-gray-500">{entry.name}</div>
               )}
             </td>
@@ -648,17 +673,25 @@ function GroupRows({ group }: { group: GroupedRows }) {
             <td className={`px-4 py-3 text-right ${short > 0 ? 'text-accent-red' : 'text-gray-200'}`}>
               {formatGbp(entry.missingAmount ?? short)}
             </td>
-            <td className="px-4 py-3 text-gray-300 whitespace-nowrap">{formatDate(entry.dateReceived)}</td>
             <td className="px-4 py-3 whitespace-nowrap">
               <span className={stale ? 'text-amber-400' : 'text-gray-300'}>
                 {formatDate(entry.lastChecked)}
                 {stale ? ' · stale' : ''}
               </span>
             </td>
-            <td className="px-4 py-3 max-w-[240px]">
+            <td className="px-4 py-3 whitespace-nowrap">
               <NotesCell
                 notes={entry.notes}
-                title={entry.propertyAddress || entry.name}
+                title={displayAddress(entry)}
+                openLabel="View notes"
+              />
+            </td>
+            <td className="px-4 py-3 whitespace-nowrap">
+              <NotesCell
+                notes={entry.source}
+                title={displayAddress(entry)}
+                heading="Source"
+                openLabel="View source"
               />
             </td>
             <td className="px-4 py-3">
