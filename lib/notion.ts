@@ -80,7 +80,7 @@ export function parseLeadFromPage(page: any): Lead {
   }
 }
 
-async function notionFetch(path: string, options: RequestInit = {}): Promise<any> {
+export async function notionFetch(path: string, options: RequestInit = {}): Promise<any> {
   const url = `${NOTION_API_BASE}${path}`
 
   const response = await fetch(url, {

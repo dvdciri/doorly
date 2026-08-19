@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { formatUKPhone } from '@/lib/phone'
+import { BackofficeToolbar } from '../BackofficeToolbar'
 
 interface Lead {
   id: string
@@ -273,32 +274,35 @@ export default function LeadsPipelinePage() {
     <div className="min-h-screen bg-navy-gradient px-4 md:px-0">
       <Navigation />
 
-      <section className="px-4 sm:px-6 lg:px-8 pt-12 md:pt-16 pb-8">
+      <section className="px-4 sm:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
         <div className="max-w-[1600px] mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <Link
-              href="/backoffice"
-              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-accent-red transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </Link>
-            <button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-accent-red transition-colors disabled:opacity-50"
-            >
-              <LogOut className="w-4 h-4" />
-              {isLoggingOut ? 'Logging out...' : 'Logout'}
-            </button>
-          </div>
-
-          <div className="text-center mb-8">
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-50 mb-2">
-              Property Leads <span className="text-accent-red">Pipeline</span>
-            </h1>
-            <p className="text-gray-300">Manage leads, stages, and Notion comments</p>
-          </div>
+          <BackofficeToolbar
+            title={
+              <>
+                Property Leads <span className="text-accent-red">Pipeline</span>
+              </>
+            }
+            subtitle="Manage leads, stages, and Notion comments"
+            left={
+              <Link
+                href="/backoffice"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-accent-red transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Dashboard
+              </Link>
+            }
+            right={
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-accent-red transition-colors disabled:opacity-50"
+              >
+                <LogOut className="w-4 h-4" />
+                {isLoggingOut ? 'Logging out...' : 'Logout'}
+              </button>
+            }
+          />
 
           {loading && (
             <div className="flex justify-center py-20">
