@@ -62,7 +62,8 @@ export function RentStatusChart({
                   outerRadius={88}
                   paddingAngle={2}
                   onClick={(entry) => {
-                    const status = (entry as RentLogStatusSlice).status
+                    const status = typeof entry.name === 'string' ? entry.name : null
+                    if (!status) return
                     onSelectStatus(selectedStatus === status ? null : status)
                   }}
                 >
