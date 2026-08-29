@@ -11,6 +11,7 @@ export interface RentLogEntry {
   expected: number
   grossReceived: number
   netReceived: number
+  expensesCharged: number
   missingAmount: number | null
   notes: string | null
   lastChecked: string | null
@@ -214,6 +215,7 @@ export function parseRentLogPage(page: any): RentLogEntry & { propertyRefId: str
     expected: asAmount(extractNumber(propertyByName(properties, ['Expected']))),
     grossReceived: asAmount(extractNumber(propertyByName(properties, ['Gross Received']))),
     netReceived: asAmount(extractNumber(propertyByName(properties, ['Net Received']))),
+    expensesCharged: asAmount(extractNumber(propertyByName(properties, ['Expenses charged']))),
     missingAmount: extractNumber(propertyByName(properties, ['Missing amount'])),
     notes: extractText(propertyByName(properties, ['Notes'])),
     lastChecked: extractDate(propertyByName(properties, ['Last checked'])),

@@ -89,6 +89,7 @@ function downloadCsv(entries: RentLogEntry[], month: string, year: string) {
     'Expected',
     'Received Gross',
     'Received Net',
+    'Expenses charged',
     'Missing amount',
     'Last checked',
     'Notes',
@@ -105,6 +106,7 @@ function downloadCsv(entries: RentLogEntry[], month: string, year: string) {
       entry.expected,
       entry.grossReceived,
       entry.netReceived,
+      entry.expensesCharged,
       entry.missingAmount,
       entry.lastChecked,
       entry.notes,
@@ -485,6 +487,7 @@ export default function RentCheckPage() {
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Expected</th>
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Received Gross</th>
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Received Net</th>
+                          <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Expenses charged</th>
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Missing</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Last checked</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Notes</th>
@@ -622,7 +625,7 @@ function GroupRows({ group }: { group: GroupedRows }) {
   return (
     <>
       <tr className="bg-navy-950/80 border-t border-white/5">
-        <td colSpan={10} className="px-4 py-2">
+        <td colSpan={11} className="px-4 py-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold text-gray-200">
               {nested ? `Block · ${group.label}` : group.label}
@@ -670,6 +673,7 @@ function GroupRows({ group }: { group: GroupedRows }) {
             <td className="px-4 py-3 text-right text-gray-200">{formatGbp(entry.expected)}</td>
             <td className="px-4 py-3 text-right text-gray-200">{formatGbp(entry.grossReceived)}</td>
             <td className="px-4 py-3 text-right text-gray-200">{formatGbp(entry.netReceived)}</td>
+            <td className="px-4 py-3 text-right text-gray-200">{formatGbp(entry.expensesCharged)}</td>
             <td className={`px-4 py-3 text-right ${short > 0 ? 'text-accent-red' : 'text-gray-200'}`}>
               {formatGbp(entry.missingAmount ?? short)}
             </td>
