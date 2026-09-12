@@ -56,6 +56,30 @@ function outstandingOf(entry: RentLogEntry): number {
   return missingAmountOf(entry)
 }
 
+/** Split a Source cell that may list several sources (newlines, semicolons, pipes, commas).
+ *  Commas inside amounts (e.g. £1,642.56) are kept intact. */
+function splitSources(source: string | null): string[] {
+  if (!source?.trim()) return []
+  return source
+    .split(/\n+|(?<!\d)\s*[,;|/]\s*(?!\d)/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+function uniqueSources(entries: RentLogEntry[]): string[] {
+  const seen = new Set<string>()
+  const list: string[] = []
+  for (const entry of entries) {
+    for (const part of splitSources(entry.source)) {
+      const key = part.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      list.push(part)
+    }
+  }
+  return list
+}
+
 function matchesSearch(entry: RentLogEntry, query: string): boolean {
   if (!query) return true
   const haystack = [
@@ -91,7 +115,7 @@ function downloadCsv(entries: RentLogEntry[], month: string, year: string) {
     'Received Net',
     'Expenses charged',
     'Missing amount',
-    'Last checked',
+    'Date received',
     'Notes',
     'Source',
     'Notion URL',
@@ -108,7 +132,7 @@ function downloadCsv(entries: RentLogEntry[], month: string, year: string) {
       entry.netReceived,
       entry.expensesCharged,
       entry.missingAmount,
-      entry.lastChecked,
+      entry.dateReceived,
       entry.notes,
       entry.source,
       entry.url,
@@ -280,6 +304,8 @@ export default function RentCheckPage() {
       .slice(0, 8)
   }, [filteredEntries])
 
+  const monthSources = useMemo(() => uniqueSources(data?.entries || []), [data])
+
   const statusChips = useMemo(() => {
     const names = data?.totals.statusSlices.map((slice) => slice.status) || []
     return ['All', ...names]
@@ -287,13 +313,15 @@ export default function RentCheckPage() {
 
   const collectedPct = data ? percent(data.totals.totalGrossReceived, data.totals.totalExpected) : null
   const netVsGross = data ? percent(data.totals.totalNetReceived, data.totals.totalGrossReceived) : null
+  const lastChecked = data?.entries[0]?.lastChecked ?? null
+  const lastCheckedStale = isStale(lastChecked)
 
   return (
     <div className="min-h-screen bg-navy-gradient px-4 md:px-0">
       <Navigation />
 
       <section className="px-4 sm:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1600px] mx-auto">
           <BackofficeToolbar
             title={
               <>
@@ -370,12 +398,21 @@ export default function RentCheckPage() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
+            {data && (
+              <p className="text-sm text-gray-400 self-center sm:self-end sm:pb-2">
+                Last checked{' '}
+                <span className={lastCheckedStale ? 'text-amber-400' : 'text-gray-200'}>
+                  {formatDate(lastChecked)}
+                  {lastCheckedStale ? ' · stale' : ''}
+                </span>
+              </p>
+            )}
           </div>
         </div>
       </section>
 
       <section className="px-4 sm:px-6 lg:px-8 pb-16">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-[1600px] mx-auto space-y-6">
           {error && (
             <div className="rounded-2xl border border-accent-red/40 bg-accent-red/10 px-4 py-3 text-sm text-gray-100">
               {error}
@@ -424,12 +461,27 @@ export default function RentCheckPage() {
                 <div className="rounded-2xl border border-accent-red/20 bg-navy-900/50 p-5">
                   <RentShortfallChart items={shortfallItems} />
                 </div>
-                <div className="rounded-2xl border border-dashed border-white/15 bg-navy-900/30 p-5 flex flex-col">
-                  <h3 className="text-sm font-semibold text-gray-200 mb-1">Chart coming soon</h3>
-                  <p className="text-xs text-gray-400 mb-4">Reserved for month-over-month trends</p>
-                  <div className="flex-1 min-h-[180px] rounded-xl bg-navy-950/40 border border-white/5 grid place-items-center text-sm text-gray-500">
-                    Empty slot
-                  </div>
+                <div className="rounded-2xl border border-accent-red/20 bg-navy-900/50 p-5 flex flex-col">
+                  <h3 className="text-sm font-semibold text-gray-200 mb-1">Sources</h3>
+                  <p className="text-xs text-gray-400 mb-4">
+                    Unique sources in {data.month} {data.year}
+                  </p>
+                  {monthSources.length === 0 ? (
+                    <div className="flex-1 min-h-[180px] rounded-xl bg-navy-950/40 border border-white/5 grid place-items-center text-sm text-gray-500">
+                      No sources recorded
+                    </div>
+                  ) : (
+                    <ul className="flex-1 min-h-[180px] max-h-[280px] overflow-y-auto scrollbar-subtle space-y-1.5 pr-1">
+                      {monthSources.map((source) => (
+                        <li
+                          key={source.toLowerCase()}
+                          className="rounded-lg border border-white/5 bg-navy-950/40 px-3 py-2 text-sm text-gray-200"
+                        >
+                          {source}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
 
@@ -489,7 +541,7 @@ export default function RentCheckPage() {
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Received Net</th>
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Expenses charged</th>
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Missing</th>
-                          <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Last checked</th>
+                          <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Date received</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Notes</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Source</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]" />
@@ -644,7 +696,6 @@ function GroupRows({ group }: { group: GroupedRows }) {
       </tr>
       {group.entries.map((entry) => {
         const short = outstandingOf(entry)
-        const stale = isStale(entry.lastChecked)
         return (
           <tr key={entry.id} className="border-t border-white/5 hover:bg-white/5">
             <td className={`px-4 py-3 ${nested ? 'pl-8' : ''}`}>
@@ -677,11 +728,8 @@ function GroupRows({ group }: { group: GroupedRows }) {
             <td className={`px-4 py-3 text-right ${short > 0 ? 'text-accent-red' : 'text-gray-200'}`}>
               {formatGbp(entry.missingAmount ?? short)}
             </td>
-            <td className="px-4 py-3 whitespace-nowrap">
-              <span className={stale ? 'text-amber-400' : 'text-gray-300'}>
-                {formatDate(entry.lastChecked)}
-                {stale ? ' · stale' : ''}
-              </span>
+            <td className="px-4 py-3 whitespace-nowrap text-gray-300">
+              {formatDate(entry.dateReceived)}
             </td>
             <td className="px-4 py-3 whitespace-nowrap">
               <NotesCell
