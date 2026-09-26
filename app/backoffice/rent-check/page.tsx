@@ -8,15 +8,19 @@ import Footer from '../../components/Footer'
 import {
   ArrowLeft,
   Download,
-  ExternalLink,
   Loader2,
   LogOut,
   RefreshCw,
   Search,
   X,
 } from 'lucide-react'
-import { missingAmountOf, type RentLogEntry, type RentLogQueryResult } from '@/lib/notion-rent-log'
-import { RentShortfallChart, RentStatusChart, statusColor } from './RentCharts'
+import {
+  MAX_MANUAL_NOTE_LENGTH,
+  missingAmountOf,
+  type RentLogEntry,
+  type RentLogQueryResult,
+} from '@/lib/notion-rent-log'
+import { RentByPropertyChart, statusColor } from './RentCharts'
 import { BackofficeToolbar } from '../BackofficeToolbar'
 
 function formatGbp(value: number | null): string {
@@ -40,9 +44,8 @@ function formatDate(value: string | null): string {
   })
 }
 
-function percent(part: number, whole: number): string | null {
-  if (!whole) return null
-  return `${Math.round((part / whole) * 100)}%`
+function propertiesLabel(count: number): string {
+  return `${count} ${count === 1 ? 'property' : 'properties'}`
 }
 
 function isStale(lastChecked: string | null): boolean {
@@ -56,30 +59,6 @@ function outstandingOf(entry: RentLogEntry): number {
   return missingAmountOf(entry)
 }
 
-/** Split a Source cell that may list several sources (newlines, semicolons, pipes, commas).
- *  Commas inside amounts (e.g. £1,642.56) are kept intact. */
-function splitSources(source: string | null): string[] {
-  if (!source?.trim()) return []
-  return source
-    .split(/\n+|(?<!\d)\s*[,;|/]\s*(?!\d)/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-}
-
-function uniqueSources(entries: RentLogEntry[]): string[] {
-  const seen = new Set<string>()
-  const list: string[] = []
-  for (const entry of entries) {
-    for (const part of splitSources(entry.source)) {
-      const key = part.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      list.push(part)
-    }
-  }
-  return list
-}
-
 function matchesSearch(entry: RentLogEntry, query: string): boolean {
   if (!query) return true
   const haystack = [
@@ -87,6 +66,7 @@ function matchesSearch(entry: RentLogEntry, query: string): boolean {
     entry.propertyAddress,
     entry.doorNumber,
     entry.notes,
+    entry.manualNote,
     entry.flatRef,
     entry.source,
     entry.status,
@@ -117,6 +97,7 @@ function downloadCsv(entries: RentLogEntry[], month: string, year: string) {
     'Missing amount',
     'Date received',
     'Notes',
+    'Manual Note',
     'Source',
     'Notion URL',
   ]
@@ -134,6 +115,7 @@ function downloadCsv(entries: RentLogEntry[], month: string, year: string) {
       entry.missingAmount,
       entry.dateReceived,
       entry.notes,
+      entry.manualNote,
       entry.source,
       entry.url,
     ]
@@ -155,9 +137,6 @@ interface GroupedRows {
   key: string
   label: string
   entries: RentLogEntry[]
-  expected: number
-  gross: number
-  outstanding: number
 }
 
 function blockKey(entry: RentLogEntry): string | null {
@@ -212,9 +191,6 @@ function groupEntries(entries: RentLogEntry[]): GroupedRows[] {
       entries: [...blockEntries].sort((a, b) =>
         (a.flatRef || '').localeCompare(b.flatRef || '', undefined, { numeric: true })
       ),
-      expected: blockEntries.reduce((sum, entry) => sum + entry.expected, 0),
-      gross: blockEntries.reduce((sum, entry) => sum + entry.grossReceived, 0),
-      outstanding: blockEntries.reduce((sum, entry) => sum + outstandingOf(entry), 0),
     }))
 
   if (ungrouped.length > 0) {
@@ -222,9 +198,6 @@ function groupEntries(entries: RentLogEntry[]): GroupedRows[] {
       key: '__ungrouped',
       label: 'Houses & ungrouped',
       entries: ungrouped,
-      expected: ungrouped.reduce((sum, entry) => sum + entry.expected, 0),
-      gross: ungrouped.reduce((sum, entry) => sum + entry.grossReceived, 0),
-      outstanding: ungrouped.reduce((sum, entry) => sum + outstandingOf(entry), 0),
     })
   }
 
@@ -264,6 +237,18 @@ export default function RentCheckPage() {
     }
   }, [])
 
+  const handleManualNoteSaved = useCallback((id: string, manualNote: string | null) => {
+    setData((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        entries: current.entries.map((entry) =>
+          entry.id === id ? { ...entry, manualNote } : entry
+        ),
+      }
+    })
+  }, [])
+
   useEffect(() => {
     fetchRentLog()
   }, [fetchRentLog])
@@ -293,26 +278,41 @@ export default function RentCheckPage() {
 
   const groups = useMemo(() => groupEntries(filteredEntries), [filteredEntries])
 
-  const shortfallItems = useMemo(() => {
-    return filteredEntries
-      .map((entry) => ({
-        label: displayAddress(entry),
-        outstanding: outstandingOf(entry),
-      }))
-      .filter((item) => item.outstanding > 0)
-      .sort((a, b) => b.outstanding - a.outstanding)
-      .slice(0, 8)
-  }, [filteredEntries])
+  const propertyChartItems = useMemo(
+    () =>
+      groups.flatMap((group) =>
+        group.entries.map((entry) => ({
+          id: entry.id,
+          label: entry.flatRef?.trim()
+            ? `${entry.flatRef.trim()} ${displayAddress(entry)}`
+            : displayAddress(entry),
+          expected: entry.expected,
+          grossReceived: entry.grossReceived,
+        }))
+      ),
+    [groups]
+  )
 
-  const monthSources = useMemo(() => uniqueSources(data?.entries || []), [data])
+  const columnTotals = useMemo(
+    () =>
+      filteredEntries.reduce(
+        (totals, entry) => ({
+          expected: totals.expected + entry.expected,
+          grossReceived: totals.grossReceived + entry.grossReceived,
+          netReceived: totals.netReceived + entry.netReceived,
+          expensesCharged: totals.expensesCharged + entry.expensesCharged,
+          missing: totals.missing + outstandingOf(entry),
+        }),
+        { expected: 0, grossReceived: 0, netReceived: 0, expensesCharged: 0, missing: 0 }
+      ),
+    [filteredEntries]
+  )
 
   const statusChips = useMemo(() => {
     const names = data?.totals.statusSlices.map((slice) => slice.status) || []
     return ['All', ...names]
   }, [data])
 
-  const collectedPct = data ? percent(data.totals.totalGrossReceived, data.totals.totalExpected) : null
-  const netVsGross = data ? percent(data.totals.totalNetReceived, data.totals.totalGrossReceived) : null
   const lastChecked = data?.entries[0]?.lastChecked ?? null
   const lastCheckedStale = isStale(lastChecked)
 
@@ -425,64 +425,37 @@ export default function RentCheckPage() {
             </div>
           ) : data ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 <KpiCard
-                  label="Expected rent"
+                  label="Expected gross"
                   value={formatGbp(data.totals.totalExpected)}
-                  hint={`${data.totals.propertyCount} ${data.totals.propertyCount === 1 ? 'property' : 'properties'}`}
+                  hint={propertiesLabel(data.totals.propertyCount)}
                 />
                 <KpiCard
-                  label="Received Gross"
-                  value={formatGbp(data.totals.totalGrossReceived)}
-                  hint={collectedPct ? `${collectedPct} of expected` : 'No expected rent set'}
+                  label="Received in full"
+                  value={formatGbp(data.totals.totalReceivedInFull)}
+                  hint={`${propertiesLabel(data.totals.paidInFullCount)} paid in full`}
                 />
                 <KpiCard
-                  label="Received Net"
+                  label="Received partial"
+                  value={formatGbp(data.totals.totalReceivedPartial)}
+                  hint={`${propertiesLabel(data.totals.partialCount)} paid partially`}
+                />
+                <KpiCard
+                  label="Net rent received"
                   value={formatGbp(data.totals.totalNetReceived)}
-                  hint={netVsGross ? `${netVsGross} of gross` : 'No gross received yet'}
+                  hint="Across all properties"
                 />
                 <KpiCard
-                  label="Missing amount"
-                  value={formatGbp(data.totals.totalMissingAmount)}
-                  hint="Rent shortfalls and extra charges"
+                  label="Missing rent"
+                  value={formatGbp(data.totals.totalMissingRent)}
+                  hint={`${propertiesLabel(data.totals.unpaidCount)} unpaid + partial shortfalls`}
                   accent
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-1 rounded-2xl border border-accent-red/20 bg-navy-900/50 p-5">
-                  <RentStatusChart
-                    slices={data.totals.statusSlices}
-                    totalGross={data.totals.totalGrossReceived}
-                    selectedStatus={statusFilter}
-                    onSelectStatus={setStatusFilter}
-                  />
-                </div>
-                <div className="rounded-2xl border border-accent-red/20 bg-navy-900/50 p-5">
-                  <RentShortfallChart items={shortfallItems} />
-                </div>
-                <div className="rounded-2xl border border-accent-red/20 bg-navy-900/50 p-5 flex flex-col">
-                  <h3 className="text-sm font-semibold text-gray-200 mb-1">Sources</h3>
-                  <p className="text-xs text-gray-400 mb-4">
-                    Unique sources in {data.month} {data.year}
-                  </p>
-                  {monthSources.length === 0 ? (
-                    <div className="flex-1 min-h-[180px] rounded-xl bg-navy-950/40 border border-white/5 grid place-items-center text-sm text-gray-500">
-                      No sources recorded
-                    </div>
-                  ) : (
-                    <ul className="flex-1 min-h-[180px] max-h-[280px] overflow-y-auto scrollbar-subtle space-y-1.5 pr-1">
-                      {monthSources.map((source) => (
-                        <li
-                          key={source.toLowerCase()}
-                          className="rounded-lg border border-white/5 bg-navy-950/40 px-3 py-2 text-sm text-gray-200"
-                        >
-                          {source}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+              <div className="rounded-2xl border border-accent-red/20 bg-navy-900/50 p-5">
+                <RentByPropertyChart items={propertyChartItems} />
               </div>
 
               <div className="rounded-2xl border border-accent-red/20 bg-navy-900/50">
@@ -492,7 +465,7 @@ export default function RentCheckPage() {
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search name, address, notes, source, flat ref"
+                      placeholder="Search name, address, notes, manual note, source, flat ref"
                       className="w-full rounded-lg bg-navy-950 border border-white/10 pl-9 pr-3 py-2 text-sm text-gray-50 placeholder:text-gray-500"
                     />
                   </div>
@@ -543,15 +516,32 @@ export default function RentCheckPage() {
                           <th className="px-4 py-3 font-medium text-right sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Missing</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Date received</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Notes</th>
+                          <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Manual note</th>
                           <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]">Source</th>
-                          <th className="px-4 py-3 font-medium sticky top-0 z-20 bg-navy-950 shadow-[0_1px_0_rgba(255,255,255,0.1)]" />
                         </tr>
                       </thead>
                       <tbody>
                         {groups.map((group) => (
-                          <GroupRows key={group.key} group={group} />
+                          <GroupRows
+                            key={group.key}
+                            group={group}
+                            onManualNoteSaved={handleManualNoteSaved}
+                          />
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr className="border-t border-white/20 bg-navy-950/80 font-semibold text-gray-50">
+                          <td className="px-4 py-3" colSpan={2}>Total</td>
+                          <td className="px-4 py-3 text-right">{formatGbp(columnTotals.expected)}</td>
+                          <td className="px-4 py-3 text-right">{formatGbp(columnTotals.grossReceived)}</td>
+                          <td className="px-4 py-3 text-right">{formatGbp(columnTotals.netReceived)}</td>
+                          <td className="px-4 py-3 text-right">{formatGbp(columnTotals.expensesCharged)}</td>
+                          <td className={`px-4 py-3 text-right ${columnTotals.missing > 0 ? 'text-accent-red' : ''}`}>
+                            {formatGbp(columnTotals.missing)}
+                          </td>
+                          <td colSpan={4} />
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 )}
@@ -671,27 +661,191 @@ function KpiCard({
   )
 }
 
-function GroupRows({ group }: { group: GroupedRows }) {
+function ManualNoteCell({
+  entry,
+  onSaved,
+}: {
+  entry: RentLogEntry
+  onSaved: (id: string, manualNote: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(entry.manualNote || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const title = displayAddress(entry)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = 'unset'
+    }
+  }, [open, saving])
+
+  const openDialog = () => {
+    setDraft(entry.manualNote || '')
+    setError(null)
+    setEditing(!entry.manualNote)
+    setOpen(true)
+  }
+
+  const save = async () => {
+    if (draft.trim().length > MAX_MANUAL_NOTE_LENGTH) return
+    setSaving(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/backoffice/rent-check/${entry.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manualNote: draft }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to save manual note')
+      }
+      onSaved(entry.id, payload.manualNote ?? null)
+      setOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save manual note')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={openDialog}
+        className="text-sm text-accent-red hover:text-accent-red/80 underline underline-offset-2 whitespace-nowrap"
+      >
+        {entry.manualNote ? 'View note' : 'Add note'}
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80"
+          onClick={() => {
+            if (!saving) setOpen(false)
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="manual-note-title"
+            className="w-full max-w-lg max-h-[80vh] overflow-hidden rounded-2xl border border-accent-red/30 bg-navy-900 shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-400">Manual note</p>
+                <h3 id="manual-note-title" className="text-base font-semibold text-gray-50 mt-1">
+                  {title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                disabled={saving}
+                className="text-gray-400 hover:text-white p-1 disabled:opacity-50"
+                aria-label="Close manual note"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {editing ? (
+              <div className="p-5 space-y-3">
+                <textarea
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  rows={5}
+                  maxLength={MAX_MANUAL_NOTE_LENGTH}
+                  placeholder="Add a note for this entry"
+                  className="w-full rounded-lg bg-navy-950 border border-white/10 px-3 py-2 text-sm text-gray-50 placeholder:text-gray-500 resize-y"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-gray-500">
+                    {draft.trim().length}/{MAX_MANUAL_NOTE_LENGTH}
+                    {error ? <span className="text-accent-red ml-2">{error}</span> : null}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (entry.manualNote) {
+                          setDraft(entry.manualNote)
+                          setError(null)
+                          setEditing(false)
+                        } else {
+                          setOpen(false)
+                        }
+                      }}
+                      disabled={saving}
+                      className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-gray-300 hover:text-white disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={save}
+                      disabled={saving}
+                      className="inline-flex items-center gap-2 rounded-lg bg-accent-red px-3 py-1.5 text-sm text-white hover:bg-accent-red/90 disabled:opacity-50"
+                    >
+                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="p-5 overflow-y-auto scrollbar-subtle whitespace-pre-wrap text-sm text-gray-200 leading-relaxed">
+                  {entry.manualNote}
+                </div>
+                <div className="px-5 pb-5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraft(entry.manualNote || '')
+                      setError(null)
+                      setEditing(true)
+                    }}
+                    className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-gray-200 hover:border-accent-red/50"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function GroupRows({
+  group,
+  onManualNoteSaved,
+}: {
+  group: GroupedRows
+  onManualNoteSaved: (id: string, manualNote: string | null) => void
+}) {
   const nested = group.key !== '__ungrouped' && group.entries.length > 0
 
   return (
     <>
       <tr className="bg-navy-950/80 border-t border-white/5">
         <td colSpan={11} className="px-4 py-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-gray-200">
-              {nested ? `Block · ${group.label}` : group.label}
-              <span className="text-gray-500 font-normal ml-2">
-                {group.entries.length} {group.entries.length === 1 ? 'entry' : 'entries'}
-              </span>
-            </span>
-            <span className="text-xs text-gray-400">
-              Exp {formatGbp(group.expected)} · Rec. Gross {formatGbp(group.gross)} · Missing{' '}
-              <span className={group.outstanding > 0 ? 'text-accent-red' : 'text-emerald-400'}>
-                {formatGbp(group.outstanding)}
-              </span>
-            </span>
-          </div>
+          <span className="text-xs font-semibold text-gray-200">
+            {group.label}
+          </span>
         </td>
       </tr>
       {group.entries.map((entry) => {
@@ -705,9 +859,6 @@ function GroupRows({ group }: { group: GroupedRows }) {
                 ) : null}
                 {displayAddress(entry)}
               </div>
-              {entry.name && entry.name !== displayAddress(entry) && (
-                <div className="text-xs text-gray-500">{entry.name}</div>
-              )}
             </td>
             <td className="px-4 py-3">
               <span
@@ -738,6 +889,9 @@ function GroupRows({ group }: { group: GroupedRows }) {
                 openLabel="View notes"
               />
             </td>
+            <td className="px-4 py-3">
+              <ManualNoteCell entry={entry} onSaved={onManualNoteSaved} />
+            </td>
             <td className="px-4 py-3 whitespace-nowrap">
               <NotesCell
                 notes={entry.source}
@@ -745,17 +899,6 @@ function GroupRows({ group }: { group: GroupedRows }) {
                 heading="Source"
                 openLabel="View source"
               />
-            </td>
-            <td className="px-4 py-3">
-              <a
-                href={entry.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex text-gray-400 hover:text-accent-red"
-                title="Open in Notion"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </a>
             </td>
           </tr>
         )

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navigation from '../components/Navigation'
 import Footer from '../components/Footer'
-import { LogOut, Building2, ArrowRight, DollarSign, MapPin, Users, ClipboardCheck } from 'lucide-react'
+import { LogOut, ArrowRight, Users, ClipboardCheck, CircleAlert } from 'lucide-react'
 import { BackofficeToolbar } from './BackofficeToolbar'
 
 interface Tool {
@@ -31,35 +31,19 @@ export default function BackofficeDashboard() {
       status: 'active',
     },
     {
-      id: 'land-registry',
-      title: 'Land Registry Query',
-      description: 'Query UK Land Registry house price data by region, property type, and time period',
-      icon: <Building2 className="w-8 h-8" />,
-      href: '/backoffice/land-registry',
-      status: 'active',
-    },
-    {
-      id: 'ons-salary',
-      title: 'ONS Salary Data',
-      description: 'Query UK salary and earnings data by local authority from the Office for National Statistics',
-      icon: <DollarSign className="w-8 h-8" />,
-      href: '/backoffice/ons-salary',
-      status: 'active',
-    },
-    {
-      id: 'portfolio-address',
-      title: 'Portfolio Address Analysis',
-      description: 'Analyze rough addresses to find full addresses, property types, and EPC ratings',
-      icon: <MapPin className="w-8 h-8" />,
-      href: '/backoffice/portfolio-address',
-      status: 'active',
-    },
-    {
       id: 'rent-check',
       title: 'Rent Check',
       description: 'Visualise rent data from Notion',
       icon: <ClipboardCheck className="w-8 h-8" />,
       href: '/backoffice/rent-check',
+      status: 'active',
+    },
+    {
+      id: 'arrears',
+      title: 'Arrears Tracking',
+      description: 'See which properties are in arrears, and by how much, as of a chosen month',
+      icon: <CircleAlert className="w-8 h-8" />,
+      href: '/backoffice/arrears',
       status: 'active',
     },
   ]
@@ -110,8 +94,6 @@ export default function BackofficeDashboard() {
 
       <section className="px-4 sm:px-6 lg:px-8 pt-4 pb-12 md:pb-20">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-bold text-gray-50 mb-8">Available Tools</h2>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tools.map((tool) => (
               <Link

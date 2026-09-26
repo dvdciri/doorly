@@ -1,7 +1,15 @@
 'use client'
 
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import type { RentLogStatusSlice } from '@/lib/notion-rent-log'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
 const STATUS_COLORS: Record<string, string> = {
   Received: '#34d399',
@@ -26,57 +34,49 @@ export function statusColor(status: string | null): string {
   return STATUS_COLORS[status] || STATUS_COLORS.Unknown
 }
 
-export function RentStatusChart({
-  slices,
-  totalGross,
-  selectedStatus,
-  onSelectStatus,
-}: {
-  slices: RentLogStatusSlice[]
-  totalGross: number
-  selectedStatus: string | null
-  onSelectStatus: (status: string | null) => void
-}) {
-  const data = slices.filter(
-    (slice) => slice.expected > 0 || slice.grossReceived > 0 || slice.count > 0
-  )
+export interface PropertyRentPoint {
+  id: string
+  label: string
+  expected: number
+  grossReceived: number
+}
 
+const MIN_PX_PER_PROPERTY = 56
+
+export function RentByPropertyChart({ items }: { items: PropertyRentPoint[] }) {
   return (
-    <div className="h-full flex flex-col">
-      <h3 className="text-sm font-semibold text-gray-200 mb-1">Expected rent by status</h3>
-      <p className="text-xs text-gray-400 mb-4">
-        Click a slice to filter the table. Centre is total gross received.
-      </p>
-      {data.length === 0 ? (
-        <p className="text-sm text-gray-400 m-auto">No amounts for this period</p>
+    <div className="flex flex-col">
+      <h3 className="text-sm font-semibold text-gray-200 mb-1">Expected vs received by property</h3>
+      <p className="text-xs text-gray-400 mb-4">Expected rent and gross received for each property</p>
+      {items.length === 0 ? (
+        <p className="text-sm text-gray-400 py-12 text-center">No properties for this filter</p>
       ) : (
-        <div className="flex-1 min-h-[220px] grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-          <div className="relative h-[220px]">
+        <div className="overflow-x-auto scrollbar-subtle">
+          <div style={{ minWidth: items.length * MIN_PX_PER_PROPERTY, height: 360 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data}
-                  dataKey="expected"
-                  nameKey="status"
-                  innerRadius={58}
-                  outerRadius={88}
-                  paddingAngle={2}
-                  onClick={(entry) => {
-                    const status = typeof entry.name === 'string' ? entry.name : null
-                    if (!status) return
-                    onSelectStatus(selectedStatus === status ? null : status)
-                  }}
-                >
-                  {data.map((slice) => (
-                    <Cell
-                      key={slice.status}
-                      fill={statusColor(slice.status)}
-                      opacity={selectedStatus && selectedStatus !== slice.status ? 0.35 : 1}
-                      cursor="pointer"
-                    />
-                  ))}
-                </Pie>
+              <BarChart data={items} margin={{ top: 8, right: 8, bottom: 8, left: 8 }} barGap={2}>
+                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
+                <XAxis
+                  dataKey="id"
+                  tickFormatter={(id) => items.find((item) => item.id === id)?.label ?? ''}
+                  interval={0}
+                  angle={-40}
+                  textAnchor="end"
+                  height={110}
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.15)' }}
+                />
+                <YAxis
+                  tickFormatter={(value) => formatGbp(Number(value || 0))}
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={72}
+                />
                 <Tooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  labelFormatter={(id) => items.find((item) => item.id === id)?.label ?? ''}
                   formatter={(value) => formatGbp(Number(value || 0))}
                   contentStyle={{
                     background: '#0f2744',
@@ -85,81 +85,18 @@ export function RentStatusChart({
                     color: '#f9fafb',
                   }}
                 />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[10px] uppercase tracking-wide text-gray-400">Gross</span>
-              <span className="text-sm font-semibold text-gray-50">{formatGbp(totalGross)}</span>
-            </div>
-          </div>
-          <ul className="space-y-2">
-            {slices.map((slice) => (
-              <li key={slice.status}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onSelectStatus(selectedStatus === slice.status ? null : slice.status)
-                  }
-                  className={`w-full text-left rounded-lg px-3 py-2 border transition-colors ${
-                    selectedStatus === slice.status
-                      ? 'border-accent-red/60 bg-accent-red/10'
-                      : 'border-white/5 bg-navy-950/40 hover:border-white/15'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-sm text-gray-200">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: statusColor(slice.status) }}
-                      />
-                      {slice.status}
-                    </span>
-                    <span className="text-sm text-gray-50">{formatGbp(slice.expected)}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {slice.count} {slice.count === 1 ? 'property' : 'properties'} · gross{' '}
-                    {formatGbp(slice.grossReceived)}
-                  </p>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export function RentShortfallChart({
-  items,
-}: {
-  items: { label: string; outstanding: number }[]
-}) {
-  const max = Math.max(...items.map((item) => item.outstanding), 1)
-
-  return (
-    <div className="h-full flex flex-col">
-      <h3 className="text-sm font-semibold text-gray-200 mb-1">Largest missing amounts</h3>
-      <p className="text-xs text-gray-400 mb-4">Shortfalls and extra charges to chase</p>
-      {items.length === 0 ? (
-        <p className="text-sm text-gray-400 m-auto">Nothing missing this period</p>
-      ) : (
-        <ul className="space-y-3 overflow-auto max-h-[260px] scrollbar-subtle pr-1">
-          {items.map((item) => (
-            <li key={item.label}>
-              <div className="flex justify-between gap-3 text-xs mb-1">
-                <span className="text-gray-300 truncate">{item.label}</span>
-                <span className="text-accent-red shrink-0">{formatGbp(item.outstanding)}</span>
-              </div>
-              <div className="h-2 rounded-full bg-navy-950/80 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-accent-red/80"
-                  style={{ width: `${Math.max((item.outstanding / max) * 100, 4)}%` }}
+                <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12, color: '#d1d5db' }} />
+                <Bar dataKey="expected" name="Expected" fill={STATUS_COLORS.Expected} radius={[3, 3, 0, 0]} />
+                <Bar
+                  dataKey="grossReceived"
+                  name="Received Gross"
+                  fill={STATUS_COLORS.Received}
+                  radius={[3, 3, 0, 0]}
                 />
-              </div>
-            </li>
-          ))}
-        </ul>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       )}
     </div>
   )

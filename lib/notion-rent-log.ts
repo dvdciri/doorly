@@ -14,6 +14,7 @@ export interface RentLogEntry {
   expensesCharged: number
   missingAmount: number | null
   notes: string | null
+  manualNote: string | null
   lastChecked: string | null
   flatRef: string | null
   doorNumber: string | null
@@ -33,6 +34,12 @@ export interface RentLogTotals {
   totalGrossReceived: number
   totalNetReceived: number
   totalMissingAmount: number
+  totalReceivedInFull: number
+  totalReceivedPartial: number
+  totalMissingRent: number
+  paidInFullCount: number
+  partialCount: number
+  unpaidCount: number
   propertyCount: number
   statusCounts: Record<string, number>
   statusSlices: RentLogStatusSlice[]
@@ -45,6 +52,46 @@ export interface RentLogQueryResult {
   yearOptions: string[]
   entries: RentLogEntry[]
   totals: RentLogTotals
+}
+
+export interface ArrearsMonthLine {
+  id: string
+  month: string
+  year: string
+  status: string | null
+  expected: number
+  grossReceived: number
+  missing: number
+  url: string
+}
+
+export interface ArrearsProperty {
+  key: string
+  label: string
+  flatRef: string | null
+  doorNumber: string | null
+  propertyAddress: string | null
+  name: string
+  monthCount: number
+  netBalance: number
+  expected: number
+  grossReceived: number
+  months: ArrearsMonthLine[]
+}
+
+export interface ArrearsTotals {
+  propertyCount: number
+  totalArrears: number
+}
+
+export interface ArrearsQueryResult {
+  month: string
+  year: string
+  monthOptions: string[]
+  yearOptions: string[]
+  unscopedCount: number
+  properties: ArrearsProperty[]
+  totals: ArrearsTotals
 }
 
 const MONTH_NAMES = [
@@ -61,6 +108,12 @@ const MONTH_NAMES = [
   'November',
   'December',
 ]
+
+export const MAX_MANUAL_NOTE_LENGTH = 2000
+
+function sameNotionId(a: string, b: string): boolean {
+  return a.replace(/-/g, '').toLowerCase() === b.replace(/-/g, '').toLowerCase()
+}
 
 function getRentLogDatabaseId(): string {
   const databaseId = process.env.NOTION_RENT_LOG_DATABASE_ID
@@ -218,6 +271,7 @@ export function parseRentLogPage(page: any): RentLogEntry & { propertyRefId: str
     expensesCharged: asAmount(extractNumber(propertyByName(properties, ['Expenses charged']))),
     missingAmount: extractNumber(propertyByName(properties, ['Missing amount'])),
     notes: extractText(propertyByName(properties, ['Notes'])),
+    manualNote: extractText(propertyByName(properties, ['Manual Note'])),
     lastChecked: extractDate(propertyByName(properties, ['Last checked'])),
     flatRef: extractText(propertyByName(properties, ['Flat ref'])),
     doorNumber: null,
@@ -227,9 +281,9 @@ export function parseRentLogPage(page: any): RentLogEntry & { propertyRefId: str
   }
 }
 
-async function resolveDoorNumbers(
+async function withDoorNumbers(
   entries: Array<RentLogEntry & { propertyRefId: string | null }>
-): Promise<RentLogEntry[]> {
+): Promise<Array<RentLogEntry & { propertyRefId: string | null }>> {
   const ids = [...new Set(entries.map((entry) => entry.propertyRefId).filter(Boolean))] as string[]
   const doors = new Map<string, string | null>()
 
@@ -247,10 +301,47 @@ async function resolveDoorNumbers(
     })
   )
 
-  return entries.map(({ propertyRefId, ...entry }) => ({
+  return entries.map((entry) => ({
     ...entry,
-    doorNumber: propertyRefId ? buildingDoorNumber(doors.get(propertyRefId) || null) : null,
+    doorNumber: entry.propertyRefId ? buildingDoorNumber(doors.get(entry.propertyRefId) || null) : null,
   }))
+}
+
+async function resolveDoorNumbers(
+  entries: Array<RentLogEntry & { propertyRefId: string | null }>
+): Promise<RentLogEntry[]> {
+  const withDoors = await withDoorNumbers(entries)
+  return withDoors.map(({ propertyRefId: _propertyRefId, ...entry }) => entry)
+}
+
+export async function updateRentLogManualNote(
+  pageId: string,
+  note: string
+): Promise<string | null> {
+  const trimmed = note.trim()
+  if (trimmed.length > MAX_MANUAL_NOTE_LENGTH) {
+    throw new Error(`Manual note must be ${MAX_MANUAL_NOTE_LENGTH} characters or fewer`)
+  }
+
+  const databaseId = getRentLogDatabaseId()
+  const page = await notionFetch(`/pages/${pageId}`)
+  const parentId = page.parent?.type === 'database_id' ? page.parent.database_id : null
+  if (!parentId || !sameNotionId(parentId, databaseId)) {
+    throw new Error('That entry is not in the rent log')
+  }
+
+  const updated = await notionFetch(`/pages/${pageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      properties: {
+        'Manual Note': {
+          rich_text: trimmed ? [{ text: { content: trimmed } }] : [],
+        },
+      },
+    }),
+  })
+
+  return extractText(propertyByName(updated.properties || {}, ['Manual Note']))
 }
 
 export function missingAmountOf(entry: RentLogEntry): number {
@@ -264,12 +355,32 @@ export function computeRentLogTotals(entries: RentLogEntry[]): RentLogTotals {
   let totalGrossReceived = 0
   let totalNetReceived = 0
   let totalMissingAmount = 0
+  let totalReceivedInFull = 0
+  let totalReceivedPartial = 0
+  let totalMissingRent = 0
+  let paidInFullCount = 0
+  let partialCount = 0
+  let unpaidCount = 0
 
   for (const entry of entries) {
     totalExpected += entry.expected
     totalGrossReceived += entry.grossReceived
     totalNetReceived += entry.netReceived
     totalMissingAmount += missingAmountOf(entry)
+
+    if (entry.grossReceived <= 0) {
+      if (entry.expected > 0) {
+        unpaidCount += 1
+        totalMissingRent += entry.expected
+      }
+    } else if (entry.grossReceived >= entry.expected) {
+      paidInFullCount += 1
+      totalReceivedInFull += entry.grossReceived
+    } else {
+      partialCount += 1
+      totalReceivedPartial += entry.grossReceived
+      totalMissingRent += entry.expected - entry.grossReceived
+    }
 
     const status = entry.status?.trim() || 'Unknown'
     const existing = statusMap.get(status) || {
@@ -304,6 +415,12 @@ export function computeRentLogTotals(entries: RentLogEntry[]): RentLogTotals {
     totalGrossReceived: roundMoney(totalGrossReceived),
     totalNetReceived: roundMoney(totalNetReceived),
     totalMissingAmount: roundMoney(totalMissingAmount),
+    totalReceivedInFull: roundMoney(totalReceivedInFull),
+    totalReceivedPartial: roundMoney(totalReceivedPartial),
+    totalMissingRent: roundMoney(totalMissingRent),
+    paidInFullCount,
+    partialCount,
+    unpaidCount,
     propertyCount: entries.length,
     statusCounts,
     statusSlices,
@@ -398,5 +515,213 @@ export async function queryRentLog(month?: string, year?: string): Promise<RentL
     yearOptions: yearOptions.length ? yearOptions : [resolvedYear, currentYearName()].filter((v, i, arr) => arr.indexOf(v) === i),
     entries,
     totals: computeRentLogTotals(entries),
+  }
+}
+
+/** Calendar index for a rent-log month/year, or null when the period cannot be ordered. */
+export function periodIndex(month: string | null, year: string | null): number | null {
+  const monthIndex = monthIndexOf(month)
+  const yearNumber = yearNumberOf(year)
+  if (monthIndex == null || yearNumber == null) return null
+  return yearNumber * 12 + monthIndex
+}
+
+function monthIndexOf(month: string | null): number | null {
+  if (!month?.trim()) return null
+  const trimmed = month.trim()
+  const exact = MONTH_NAMES.findIndex((name) => name.toLowerCase() === trimmed.toLowerCase())
+  if (exact >= 0) return exact
+
+  const numbered = trimmed.match(/^(\d{1,2})\b/)
+  if (numbered) {
+    const value = Number(numbered[1])
+    if (value >= 1 && value <= 12) return value - 1
+  }
+
+  const contained = MONTH_NAMES.findIndex((name) => trimmed.toLowerCase().includes(name.toLowerCase()))
+  if (contained >= 0) return contained
+  return null
+}
+
+function yearNumberOf(year: string | null): number | null {
+  if (!year?.trim()) return null
+  const match = year.match(/\d{4}/)
+  if (!match) return null
+  const value = Number(match[0])
+  return Number.isFinite(value) ? value : null
+}
+
+function normaliseKeyPart(value: string | null | undefined): string | null {
+  const text = value?.trim().replace(/\s+/g, ' ').toLowerCase()
+  return text || null
+}
+
+/** Mirrors Rent Check: a block is address + door (or the P-code), and each flat ref within it is its own unit. */
+function arrearsPropertyKey(entry: RentLogEntry & { propertyRefId: string | null }): string {
+  const flat = normaliseKeyPart(entry.flatRef)
+  const address = normaliseKeyPart(entry.propertyAddress)
+  const door = normaliseKeyPart(entry.doorNumber)
+  const code = entry.name.match(/\b(P\d+)\b/i)?.[1]?.toLowerCase() ?? null
+
+  let block: string | null = null
+  if (address && door) block = `block:${address}|${door}`
+  else if (address) block = `addr:${address}`
+  else if (code) block = `code:${code}`
+  else if (entry.propertyRefId) block = `ref:${entry.propertyRefId}`
+
+  if (flat) return `${block ?? 'flat'}|flat:${flat}`
+  if (block) return block
+  return `name:${normaliseKeyPart(entry.name) || entry.id}`
+}
+
+function arrearsPlaceLabel(entry: RentLogEntry): string {
+  const address = entry.propertyAddress?.trim()
+  const door = entry.doorNumber?.trim()
+  if (address && door) return `${door} ${address}`
+  return address || entry.name
+}
+
+export function aggregateArrears(
+  entries: Array<RentLogEntry & { propertyRefId: string | null }>,
+  cutoff: number
+): { properties: ArrearsProperty[]; unscopedCount: number } {
+  let unscopedCount = 0
+  const groups = new Map<string, Array<RentLogEntry & { propertyRefId: string | null }>>()
+
+  for (const entry of entries) {
+    const index = periodIndex(entry.month, entry.year)
+    if (index == null) {
+      unscopedCount += 1
+      continue
+    }
+    if (index > cutoff) continue
+
+    const key = arrearsPropertyKey(entry)
+    const list = groups.get(key) || []
+    list.push(entry)
+    groups.set(key, list)
+  }
+
+  const properties: ArrearsProperty[] = []
+  for (const [key, rows] of groups) {
+    const sorted = [...rows].sort((a, b) => {
+      const ai = periodIndex(a.month, a.year) ?? 0
+      const bi = periodIndex(b.month, b.year) ?? 0
+      if (ai !== bi) return ai - bi
+      return a.id.localeCompare(b.id)
+    })
+    const latest = sorted[sorted.length - 1]
+    let expected = 0
+    let grossReceived = 0
+    const months: ArrearsMonthLine[] = sorted.map((row) => {
+      const missing = missingAmountOf(row)
+      expected += row.expected
+      grossReceived += row.grossReceived
+      return {
+        id: row.id,
+        month: row.month || '',
+        year: row.year || '',
+        status: row.status,
+        expected: roundMoney(row.expected),
+        grossReceived: roundMoney(row.grossReceived),
+        missing: roundMoney(missing),
+        url: row.url,
+      }
+    })
+
+    const netBalance = roundMoney(expected - grossReceived)
+    if (netBalance <= 0) continue
+
+    properties.push({
+      key,
+      label: arrearsPlaceLabel(latest),
+      flatRef: latest.flatRef,
+      doorNumber: latest.doorNumber,
+      propertyAddress: latest.propertyAddress,
+      name: latest.name,
+      monthCount: months.length,
+      netBalance,
+      expected: roundMoney(expected),
+      grossReceived: roundMoney(grossReceived),
+      months,
+    })
+  }
+
+  properties.sort((a, b) => {
+    if (b.netBalance !== a.netBalance) return b.netBalance - a.netBalance
+    return a.label.localeCompare(b.label)
+  })
+
+  return { properties, unscopedCount }
+}
+
+function computeArrearsTotals(properties: ArrearsProperty[]): ArrearsTotals {
+  const totalArrears = properties.reduce((sum, property) => sum + property.netBalance, 0)
+  return {
+    propertyCount: properties.length,
+    totalArrears: roundMoney(totalArrears),
+  }
+}
+
+async function queryAllRentLogPages(databaseId: string): Promise<any[]> {
+  const pages: any[] = []
+  let startCursor: string | undefined
+
+  do {
+    const body: Record<string, any> = { page_size: 100 }
+    if (startCursor) body.start_cursor = startCursor
+
+    const data = await notionFetch(`/databases/${databaseId}/query`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+
+    for (const page of data.results || []) {
+      pages.push(page)
+    }
+
+    startCursor = data.has_more ? data.next_cursor : undefined
+  } while (startCursor)
+
+  return pages
+}
+
+export async function queryRentArrears(month?: string, year?: string): Promise<ArrearsQueryResult> {
+  const databaseId = getRentLogDatabaseId()
+  const database = await notionFetch(`/databases/${databaseId}`)
+  const databaseProperties = database.properties || {}
+
+  const monthOptions = getSelectOptions(propertyByName(databaseProperties, ['Month']))
+  const yearOptions = getSelectOptions(propertyByName(databaseProperties, ['Year']))
+
+  const resolvedMonth = matchOption(
+    month || currentMonthName(),
+    monthOptions.length ? monthOptions : [currentMonthName()]
+  )
+  const resolvedYear = matchOption(
+    year || currentYearName(),
+    yearOptions.length ? yearOptions : [currentYearName()]
+  )
+
+  const cutoff = periodIndex(resolvedMonth, resolvedYear)
+  if (cutoff == null) {
+    throw new Error(`Cannot order the selected period ${resolvedMonth} ${resolvedYear}`)
+  }
+
+  const pages = await queryAllRentLogPages(databaseId)
+  const rawEntries = pages.map((page) => parseRentLogPage(page))
+  const entries = await withDoorNumbers(rawEntries)
+  const { properties, unscopedCount } = aggregateArrears(entries, cutoff)
+
+  return {
+    month: resolvedMonth,
+    year: resolvedYear,
+    monthOptions: monthOptions.length ? monthOptions : MONTH_NAMES,
+    yearOptions: yearOptions.length
+      ? yearOptions
+      : [resolvedYear, currentYearName()].filter((value, index, all) => all.indexOf(value) === index),
+    unscopedCount,
+    properties,
+    totals: computeArrearsTotals(properties),
   }
 }
